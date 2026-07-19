@@ -85,6 +85,21 @@ function TokenMesh({
     }
   }
 
+  // 视角飞完、尚未迈步：先停在起步格（逻辑位置已是终点，不能用 React position）
+  useEffect(() => {
+    if (!holdAtStart || stepFrom === null) return
+    visualIndex.current = stepFrom
+    queue.current = []
+    syncWorld(stepFrom)
+    if (reportLive) {
+      syncTokenLivePosition([
+        fromXZ.current.x + ox,
+        FOLLOW_Y,
+        fromXZ.current.z + oz,
+      ])
+    }
+  }, [holdAtStart, stepFrom, ox, oz, boardLength, reportLive])
+
   // 非走动时：逻辑位置变化则瞬移对齐
   useEffect(() => {
     if (stepping || holdAtStart) return
@@ -95,10 +110,17 @@ function TokenMesh({
     arrived.current = false
   }, [player.position, stepping, holdAtStart, ox, oz, boardLength])
 
-  // 开局 / 棋盘尺寸变化时对齐一次
+  // 走动或等待开步时不要打断 queue / progress
   useEffect(() => {
+    if (stepping) return
+    steppingKey.current = null
+  }, [stepping])
+
+  // 开局 / 棋盘尺寸变化时对齐一次（走动中跳过）
+  useEffect(() => {
+    if (stepping || holdAtStart) return
     syncWorld(visualIndex.current)
-  }, [ox, oz, boardLength])
+  }, [ox, oz, boardLength, stepping, holdAtStart])
 
   // 开始走动：从 stepFrom 走到逻辑终点
   useEffect(() => {
@@ -171,11 +193,10 @@ function TokenMesh({
     if (reportLive) {
       syncTokenLivePosition([g.position.x, FOLLOW_Y, g.position.z])
     }
-  }, -1) // 优先于相机跟随，先写入棋子坐标
+  }, -1) // 先于相机跟随写入 live ref
 
-  const spawn = tileWorldPosition(player.position, boardLength)
   return (
-    <group ref={ref} position={[spawn[0] + ox, TOKEN_Y, spawn[2] + oz]}>
+    <group ref={ref}>
       <AnimalFigure kind={animal} accent={player.color} />
     </group>
   )

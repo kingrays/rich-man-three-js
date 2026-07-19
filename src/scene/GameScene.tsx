@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { MOUSE, TOUCH } from 'three'
 import { BoardMesh, getBoardMetrics } from './Board'
 import { CameraFocusController } from './CameraFocusController'
@@ -39,8 +39,8 @@ export function GameScene() {
   const prevPhase = useRef(phase)
   /** 本次掷骰/走动所等待的飞往到达序号下限 */
   const expectArrivalAfter = useRef(0)
-  /** 视角飞完并停顿后，才允许骰子/棋子真正开演 */
-  const [actionArmed, setActionArmed] = useState(false)
+  /** 视角飞完并停顿后，才允许当前阶段开演（须与 phase 一致，避免 rolling→moving 误触） */
+  const [armedPhase, setArmedPhase] = useState<'rolling' | 'moving' | null>(null)
 
   const properties = useGameStore((s) => s.state.properties)
   const board = useGameStore((s) => s.state.board)
@@ -59,8 +59,13 @@ export function GameScene() {
   const movingPlayerId =
     phase === 'moving' && currentPlayer ? currentPlayer.id : null
   const moveSteps = phase === 'moving' ? (lastDice?.value ?? null) : null
-  const rollingActive = phase === 'rolling' && actionArmed
-  const moveActive = phase === 'moving' && actionArmed
+  const rollingActive = phase === 'rolling' && armedPhase === 'rolling'
+  const moveActive = phase === 'moving' && armedPhase === 'moving'
+
+  // 阶段切换时同步清锁，须早于子组件 useEffect，否则 moving 首帧会误触迈步
+  useLayoutEffect(() => {
+    setArmedPhase(null)
+  }, [phase])
 
   // 真正开掷后相机跟随骰子
   useEffect(() => {
@@ -81,7 +86,6 @@ export function GameScene() {
     prevPhase.current = phase
 
     if (phase === 'rolling') {
-      setActionArmed(false)
       expectArrivalAfter.current = useCameraStore.getState().arrivalSeq
       focusDice()
       return
@@ -92,17 +96,13 @@ export function GameScene() {
       const steps = state.lastDice?.value ?? 0
       const len = state.board.length
       if (!player || player.bankrupt || steps <= 0) {
-        setActionArmed(false)
         return
       }
-      setActionArmed(false)
       expectArrivalAfter.current = useCameraStore.getState().arrivalSeq
       const startTile = (player.position - steps + len) % len
       focusPlayer(player.id, startTile)
       return
     }
-
-    setActionArmed(false)
     // 掷骰后未走动（如仍在监狱）：回到当前玩家
     if (prev === 'rolling') {
       const state = useGameStore.getState().state
@@ -115,7 +115,9 @@ export function GameScene() {
   useEffect(() => {
     if (!needsFocusGate) return
     if (arrivalSeq <= expectArrivalAfter.current) return
-    const t = window.setTimeout(() => setActionArmed(true), HOLD_AFTER_FOCUS_MS)
+    const t = window.setTimeout(() => {
+      setArmedPhase(phase === 'moving' ? 'moving' : 'rolling')
+    }, HOLD_AFTER_FOCUS_MS)
     return () => window.clearTimeout(t)
   }, [arrivalSeq, needsFocusGate, phase])
 

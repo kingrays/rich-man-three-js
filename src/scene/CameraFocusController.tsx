@@ -1,10 +1,16 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { Vector3 } from 'three'
-import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { Player } from '../game/types'
 import { diceLiveRef, tokenLiveRef, useCameraStore } from '../store/cameraStore'
 import { tileWorldPosition } from './Board'
+
+/** OrbitControls 运行时实例（避免依赖 three-stdlib 类型包） */
+type OrbitControlsImpl = {
+  enabled: boolean
+  target: Vector3
+  update: () => void
+}
 
 /** 飞往动画时长（秒） */
 export const FOCUS_DURATION = 0.65
@@ -132,6 +138,12 @@ export function CameraFocusController({
     const ctrl = controls as OrbitControlsImpl | null
     if (!ctrl) return
 
+    // 用 getState 读最新跟随开关，避免渲染时序导致跟丢
+    const { followDice, followToken } = useCameraStore.getState()
+    const autoPilot = !!anim.current || followDice || followToken
+    // 自动运镜时暂停 OrbitControls，避免阻尼每帧把镜头拽回去（与骰子跟随同理）
+    ctrl.enabled = !autoPilot
+
     // 优先播完飞往动画
     const a = anim.current
     if (a) {
@@ -149,9 +161,6 @@ export function CameraFocusController({
       return
     }
 
-    // 用 getState 读最新跟随开关，避免渲染时序导致跟丢
-    const { followDice, followToken } = useCameraStore.getState()
-
     // 投掷过程：跟随骰子
     if (followDice) {
       const [dx, dy, dz] = diceLiveRef.current
@@ -167,12 +176,13 @@ export function CameraFocusController({
       return
     }
 
-    // 走动过程：紧跟棋子（每格仅 0.28s，慢插值会严重滞后）
+    // 走动过程：与骰子相同插值跟随，步长更快以匹配 0.28s/格
     if (followToken) {
       const [tx, ty, tz] = tokenLiveRef.current
       if (!Number.isFinite(tx) || !Number.isFinite(ty) || !Number.isFinite(tz)) {
         return
       }
+      const k = Math.min(1, dt * 18)
       followTarget.current.set(tx, ty, tz)
       followCam.current.copy(followTarget.current).add(tokenFollowOffset.current)
       if (
@@ -182,9 +192,8 @@ export function CameraFocusController({
       ) {
         return
       }
-      // 直接贴合目标，保证走格子时视角持续跟随
-      ctrl.target.copy(followTarget.current)
-      camera.position.copy(followCam.current)
+      ctrl.target.lerp(followTarget.current, k)
+      camera.position.lerp(followCam.current, k)
       ctrl.update()
     }
   }) // 优先级须 ≤0；>0 会接管渲染并关闭自动 gl.render，导致棋盘空白
