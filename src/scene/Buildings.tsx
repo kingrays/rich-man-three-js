@@ -128,24 +128,48 @@ export function DeedMarker({
 }
 
 export function TrainModel({ position }: { position: [number, number, number] }) {
+  // 小火车：车身 + 烟囱，略放大便于辨认
   return (
-    <group position={position} scale={0.85}>
-      <mesh position={[0, 0.06, 0]} castShadow>
-        <boxGeometry args={[0.22, 0.1, 0.12]} />
-        <meshStandardMaterial color="#2c3e50" metalness={0.4} roughness={0.4} />
+    <group position={position} scale={1.05}>
+      <mesh position={[0, 0.02, 0]} castShadow>
+        <boxGeometry args={[0.26, 0.03, 0.14]} />
+        <meshStandardMaterial color="#1a1512" metalness={0.4} roughness={0.5} />
       </mesh>
-      <mesh position={[0.08, 0.12, 0]} castShadow>
-        <boxGeometry args={[0.1, 0.08, 0.1]} />
-        <meshStandardMaterial color="#34495e" metalness={0.35} roughness={0.45} />
+      <mesh position={[0, 0.08, 0]} castShadow>
+        <boxGeometry args={[0.24, 0.1, 0.12]} />
+        <meshStandardMaterial color="#2c3e50" metalness={0.45} roughness={0.38} />
       </mesh>
-      {([-0.06, 0.08] as const).flatMap((x) =>
+      <mesh position={[0.09, 0.15, 0]} castShadow>
+        <boxGeometry args={[0.1, 0.1, 0.1]} />
+        <meshStandardMaterial color="#3d566e" metalness={0.4} roughness={0.4} />
+      </mesh>
+      <mesh position={[-0.06, 0.18, 0]} castShadow>
+        <cylinderGeometry args={[0.025, 0.03, 0.1, 8]} />
+        <meshStandardMaterial color="#5c4030" metalness={0.35} roughness={0.45} />
+      </mesh>
+      <mesh position={[-0.06, 0.24, 0]}>
+        <sphereGeometry args={[0.02, 8, 8]} />
+        <meshStandardMaterial color="#95a5a6" metalness={0.2} roughness={0.6} />
+      </mesh>
+      {([-0.07, 0.09] as const).flatMap((x) =>
         ([0.07, -0.07] as const).map((z) => (
-          <mesh key={`${x}-${z}`} position={[x, 0.02, z]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.03, 0.03, 0.04, 10]} />
-            <meshStandardMaterial color="#1a1a1a" />
+          <mesh key={`${x}-${z}`} position={[x, 0.025, z]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.032, 0.032, 0.04, 10]} />
+            <meshStandardMaterial color="#1a1a1a" metalness={0.5} roughness={0.4} />
           </mesh>
         )),
       )}
+      {/* 车头黄铜灯 */}
+      <mesh position={[0.15, 0.1, 0]}>
+        <sphereGeometry args={[0.022, 8, 8]} />
+        <meshStandardMaterial
+          color="#d4a84b"
+          emissive="#c9922a"
+          emissiveIntensity={0.35}
+          metalness={0.55}
+          roughness={0.3}
+        />
+      </mesh>
     </group>
   )
 }
@@ -158,28 +182,50 @@ export function UtilityModel({
   position: [number, number, number]
 }) {
   if (kind === 'electric') {
+    // 电力：灯柱 + 发光球，底座略大更易辨认
     return (
-      <group position={position}>
-        <mesh position={[0, 0.1, 0]} castShadow>
-          <cylinderGeometry args={[0.02, 0.025, 0.2, 6]} />
-          <meshStandardMaterial color="#7f8c8d" metalness={0.5} />
+      <group position={position} scale={1.15}>
+        <mesh position={[0, 0.02, 0]} castShadow>
+          <cylinderGeometry args={[0.05, 0.055, 0.04, 8]} />
+          <meshStandardMaterial color="#4a5560" metalness={0.55} roughness={0.4} />
         </mesh>
-        <mesh position={[0, 0.22, 0]}>
-          <sphereGeometry args={[0.05, 10, 10]} />
-          <meshStandardMaterial color="#f1c40f" emissive="#d4a017" emissiveIntensity={0.4} />
+        <mesh position={[0, 0.12, 0]} castShadow>
+          <cylinderGeometry args={[0.02, 0.028, 0.2, 6]} />
+          <meshStandardMaterial color="#8a959c" metalness={0.6} roughness={0.35} />
+        </mesh>
+        <mesh position={[0, 0.24, 0]}>
+          <sphereGeometry args={[0.055, 12, 12]} />
+          <meshStandardMaterial
+            color="#f1c40f"
+            emissive="#d4a017"
+            emissiveIntensity={0.55}
+            metalness={0.2}
+            roughness={0.3}
+          />
         </mesh>
       </group>
     )
   }
+  // 水务：水罐造型，青蓝金属感
   return (
-    <group position={position}>
-      <mesh position={[0, 0.05, 0]} castShadow>
-        <cylinderGeometry args={[0.06, 0.07, 0.1, 10]} />
-        <meshStandardMaterial color="#5dade2" metalness={0.3} roughness={0.35} />
+    <group position={position} scale={1.15}>
+      <mesh position={[0, 0.03, 0]} castShadow>
+        <cylinderGeometry args={[0.055, 0.06, 0.05, 10]} />
+        <meshStandardMaterial color="#2c5a6e" metalness={0.45} roughness={0.4} />
       </mesh>
-      <mesh position={[0, 0.12, 0]}>
-        <sphereGeometry args={[0.045, 10, 10]} />
-        <meshStandardMaterial color="#3498db" metalness={0.4} roughness={0.25} />
+      <mesh position={[0, 0.1, 0]} castShadow>
+        <cylinderGeometry args={[0.065, 0.07, 0.12, 12]} />
+        <meshStandardMaterial color="#5dade2" metalness={0.4} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.2, 0]}>
+        <sphereGeometry args={[0.05, 12, 12]} />
+        <meshStandardMaterial
+          color="#3498db"
+          metalness={0.5}
+          roughness={0.22}
+          emissive="#1a6a9a"
+          emissiveIntensity={0.2}
+        />
       </mesh>
     </group>
   )
