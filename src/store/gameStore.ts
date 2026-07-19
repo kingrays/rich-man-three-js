@@ -36,12 +36,19 @@ function sanitizePersistedState(raw: unknown): GameState {
     goSalary: typeof parsed.goSalary === 'number' ? parsed.goSalary : GO_SALARY,
   }
 
-  // 兼容旧存档：补全棋子角色与经济字段
+  // 兼容旧存档：补全棋子角色、监狱与连掷字段（缺失会导致关不住人 / 出狱卡无效）
   state = {
     ...state,
     players: state.players.map((p, i) => ({
       ...p,
       animalKind: p.animalKind ?? ANIMAL_KINDS[i % ANIMAL_KINDS.length]!,
+      inJail: !!p.inJail,
+      jailTurns: typeof p.jailTurns === 'number' ? p.jailTurns : 0,
+      getOutOfJailCards:
+        typeof p.getOutOfJailCards === 'number' ? p.getOutOfJailCards : 0,
+      consecutiveDoubles:
+        typeof p.consecutiveDoubles === 'number' ? p.consecutiveDoubles : 0,
+      bankrupt: !!p.bankrupt,
     })),
   }
 

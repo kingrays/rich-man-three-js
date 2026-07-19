@@ -976,32 +976,43 @@ function endTurn(state: GameState): GameState {
 
 function payJailFine(state: GameState): GameState {
   const player = currentPlayer(state)
-  if (!player.inJail || state.phase !== 'waitingRoll') return state
+  if (state.phase !== 'waitingRoll') {
+    return addLog(state, '仅在掷骰前可交保释金出狱')
+  }
+  if (!player.inJail) {
+    return addLog(state, '你当前不在监狱')
+  }
   let next = tryPay(state, player.id, JAIL_FINE, null, '出狱罚金')
   if (next.phase === 'debt') return next
   next = updatePlayer(next, player.id, { inJail: false, jailTurns: 0 })
-  next = addLog(next, `${player.name} 支付 $${JAIL_FINE} 出狱`)
+  next = addLog(next, `${player.name} 支付 $${JAIL_FINE} 出狱，本回合可掷骰移动`)
   next = { ...next, phase: 'waitingRoll' }
   return next
 }
 
 function useJailCard(state: GameState): GameState {
   const player = currentPlayer(state)
-  if (!player.inJail || player.getOutOfJailCards <= 0 || state.phase !== 'waitingRoll') {
-    return state
+  if (state.phase !== 'waitingRoll') {
+    return addLog(state, '仅在掷骰前可使用出狱卡')
+  }
+  if (!player.inJail) {
+    return addLog(state, '你当前不在监狱')
+  }
+  if (player.getOutOfJailCards <= 0) {
+    return addLog(state, '没有出狱卡')
   }
   let next = updatePlayer(state, player.id, {
     inJail: false,
     jailTurns: 0,
     getOutOfJailCards: player.getOutOfJailCards - 1,
   })
-  // 卡牌回到弃牌（简化进 chance discard）
+  // 出狱卡回到弃牌堆（简化进 chance discard）
   next = {
     ...next,
     chanceDiscard: [...next.chanceDiscard, 'ch7'],
   }
-  next = addLog(next, `${player.name} 使用出狱卡`)
-  return next
+  next = addLog(next, `${player.name} 使用出狱卡，本回合可掷骰移动`)
+  return { ...next, phase: 'waitingRoll' }
 }
 
 function startTrade(state: GameState, toId: number): GameState {

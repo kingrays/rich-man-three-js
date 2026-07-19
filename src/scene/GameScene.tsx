@@ -134,6 +134,16 @@ export function GameScene() {
     return () => window.clearTimeout(t)
   }, [moveActive, moveSteps, onMoveComplete])
 
+  // 视角门闩迟迟未解锁时，仍要完成落地（含「进监狱」格送监）
+  useEffect(() => {
+    if (phase !== 'moving' || moveActive) return
+    const t = window.setTimeout(() => {
+      if (useGameStore.getState().state.phase !== 'moving') return
+      onMoveComplete()
+    }, HOLD_AFTER_FOCUS_MS + 2500)
+    return () => window.clearTimeout(t)
+  }, [phase, moveActive, onMoveComplete])
+
   const onSettled = useCallback(
     (die: number) => {
       if (finishLock.current) return
