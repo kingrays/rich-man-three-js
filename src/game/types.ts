@@ -1,4 +1,4 @@
-/** 铁路 / 公用事业分组（街道地产已取消色组） */
+/** 铁路 / 公用事业分组（城市地产已取消色组） */
 export type ColorGroup = 'railroad' | 'utility'
 
 export type TileType =
@@ -26,10 +26,19 @@ export interface TileDef {
   taxAmount?: number
 }
 
+/** 机会卡「前进到…」的语义目标（随本局棋盘解析） */
+export type MoveSlot =
+  | 'go'
+  | 'earlyProperty'
+  | 'midProperty'
+  | 'topProperty'
+  | 'firstRailroad'
+
 /** 卡牌效果 */
 export type CardEffect =
   | { kind: 'money'; amount: number }
   | { kind: 'moveTo'; position: number; collectGo?: boolean }
+  | { kind: 'moveToSlot'; slot: MoveSlot; collectGo?: boolean }
   | { kind: 'moveSteps'; steps: number }
   | { kind: 'gotoJail' }
   | { kind: 'getOutOfJail' }
@@ -139,6 +148,10 @@ export interface GameLogEntry {
 
 export interface GameState {
   phase: Phase
+  /** 本局棋盘（含随机城市名） */
+  board: TileDef[]
+  /** 开局所选棋盘规格 */
+  boardSize: 'mini' | 'small' | 'medium' | 'large' | 'xlarge'
   players: Player[]
   currentPlayerIndex: number
   properties: Record<number, PropertyState>
@@ -153,7 +166,7 @@ export interface GameState {
   /** 待处理的地产购买（当前格） */
   pendingPurchaseTileId: number | null
   /**
-   * 本回合停靠自家街道后的一次性建房机会（格 id）。
+   * 本回合停靠自家城市后的一次性建房机会（格 id）。
    * 建完或结束回合后清空，防止同一回合连建多级。
    */
   landingBuildTileId: number | null
@@ -187,6 +200,8 @@ export type GameAction =
       startingCash?: number
       /** 过起点金币；缺省用默认值 */
       goSalary?: number
+      /** 棋盘大小；缺省中号 40 格 */
+      boardSize?: 'mini' | 'small' | 'medium' | 'large' | 'xlarge'
     }
   | { type: 'ROLL_DICE' }
   | { type: 'FINISH_ROLL'; die: number } // 物理结算后的单骰点数

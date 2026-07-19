@@ -11,14 +11,14 @@ export const CHANCE_CARDS: CardDef[] = [
   {
     id: 'ch2',
     deck: 'chance',
-    text: '前进到伊利诺伊大道。若经过起点，领取 $200。',
-    effect: { kind: 'moveTo', position: 24, collectGo: true },
+    text: '前进到一座热门城市。若经过起点，领取过路奖金。',
+    effect: { kind: 'moveToSlot', slot: 'midProperty', collectGo: true },
   },
   {
     id: 'ch3',
     deck: 'chance',
-    text: '前进到圣查尔斯广场。若经过起点，领取 $200。',
-    effect: { kind: 'moveTo', position: 11, collectGo: true },
+    text: '前进到一座新兴城市。若经过起点，领取过路奖金。',
+    effect: { kind: 'moveToSlot', slot: 'earlyProperty', collectGo: true },
   },
   {
     id: 'ch4',
@@ -71,14 +71,14 @@ export const CHANCE_CARDS: CardDef[] = [
   {
     id: 'ch12',
     deck: 'chance',
-    text: '搭乘阅读铁路。若经过起点，领取 $200。',
-    effect: { kind: 'moveTo', position: 5, collectGo: true },
+    text: '搭乘第一条铁路。若经过起点，领取过路奖金。',
+    effect: { kind: 'moveToSlot', slot: 'firstRailroad', collectGo: true },
   },
   {
     id: 'ch13',
     deck: 'chance',
-    text: '前进到板球大道。',
-    effect: { kind: 'moveTo', position: 39, collectGo: true },
+    text: '前进到本局最贵的城市。',
+    effect: { kind: 'moveToSlot', slot: 'topProperty', collectGo: true },
   },
   {
     id: 'ch14',
@@ -183,7 +183,7 @@ export const CHEST_CARDS: CardDef[] = [
   {
     id: 'ce14',
     deck: 'chest',
-    text: '街道维修：每栋房屋付 $40，每座酒店付 $115。',
+    text: '城市维修：每栋房屋付 $40，每座酒店付 $115。',
     effect: { kind: 'repairs', house: 40, hotel: 115 },
   },
   {

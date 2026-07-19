@@ -1,4 +1,7 @@
-import { BOARD, COLOR_GROUP_TILES, getTile } from '../board'
+import {
+  colorGroupTileIds,
+  getTile,
+} from '../board'
 import type { GameState, Player, PropertyState } from '../types'
 
 export function currentPlayer(state: GameState): Player {
@@ -58,21 +61,25 @@ export function calcPropertyRent(
   diceTotal?: number,
   railroadMultiplier = 1,
 ): number {
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   const ps = state.properties[tileId]!
   if (ps.ownerId === null || ps.mortgaged) return 0
 
   if (tile.type === 'railroad') {
-    const count = COLOR_GROUP_TILES.railroad!.filter(
-      (id) => state.properties[id]?.ownerId === ps.ownerId && !state.properties[id]?.mortgaged,
+    const count = colorGroupTileIds(state.board, 'railroad').filter(
+      (id) =>
+        state.properties[id]?.ownerId === ps.ownerId &&
+        !state.properties[id]?.mortgaged,
     ).length
     const base = tile.rent![count - 1] ?? 0
     return base * railroadMultiplier
   }
 
   if (tile.type === 'utility') {
-    const count = COLOR_GROUP_TILES.utility!.filter(
-      (id) => state.properties[id]?.ownerId === ps.ownerId && !state.properties[id]?.mortgaged,
+    const count = colorGroupTileIds(state.board, 'utility').filter(
+      (id) =>
+        state.properties[id]?.ownerId === ps.ownerId &&
+        !state.properties[id]?.mortgaged,
     ).length
     const mult = tile.rent![count - 1] ?? 4
     return (diceTotal ?? 0) * mult
@@ -83,7 +90,7 @@ export function calcPropertyRent(
     if (houses > 0) {
       return tile.rent![houses] ?? 0
     }
-    // 空地：按基础租金（街道已取消色组成套双倍）
+    // 空地：按基础租金（城市地产已取消色组成套双倍）
     return tile.rent![0] ?? 0
   }
 
@@ -96,7 +103,7 @@ export function countHousesAndHotels(
 ): { houses: number; hotels: number } {
   let houses = 0
   let hotels = 0
-  for (const tile of BOARD) {
+  for (const tile of state.board) {
     if (tile.type !== 'property') continue
     const ps = state.properties[tile.id]
     if (!ps || ps.ownerId !== playerId) continue
@@ -106,13 +113,13 @@ export function countHousesAndHotels(
   return { houses, hotels }
 }
 
-/** 街道是否具备建房物理条件（拥有、现金、库存等，不含落地次数） */
+/** 城市地产是否具备建房物理条件（拥有、现金、库存等，不含落地次数） */
 export function isBuildEligible(
   state: GameState,
   playerId: number,
   tileId: number,
 ): boolean {
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   if (tile.type !== 'property' || !tile.houseCost) return false
   const ps = state.properties[tileId]!
   if (ps.ownerId !== playerId || ps.mortgaged || ps.houses >= 5) return false
@@ -136,7 +143,7 @@ export function canBuildHouse(state: GameState, playerId: number, tileId: number
 }
 
 export function canSellHouse(state: GameState, playerId: number, tileId: number): boolean {
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   if (tile.type !== 'property') return false
   const ps = state.properties[tileId]!
   if (ps.ownerId !== playerId || ps.houses <= 0) return false

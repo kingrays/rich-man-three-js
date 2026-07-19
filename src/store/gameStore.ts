@@ -1,9 +1,9 @@
 import { create } from 'zustand'
-import { GO_SALARY, STARTING_CASH } from '../game/board'
+import { DEFAULT_BOARD_SIZE, GO_SALARY, STARTING_CASH } from '../game/board'
 import { createLobbyState, reduce } from '../game/engine'
 import { ANIMAL_KINDS, type GameAction, type GameState } from '../game/types'
 
-const STORAGE_KEY = 'rich-man-save-v1'
+const STORAGE_KEY = 'rich-man-save-v2'
 
 interface GameStore {
   state: GameState
@@ -18,9 +18,16 @@ function sanitizePersistedState(raw: unknown): GameState {
   const base = createLobbyState()
   const parsed = raw as Partial<GameState>
 
+  // 旧存档无 board 字段：直接回大厅，避免格数与坐标错乱
+  if (!Array.isArray(parsed.board) || parsed.board.length < 16) {
+    return createLobbyState()
+  }
+
   let state: GameState = {
     ...base,
     ...parsed,
+    board: parsed.board,
+    boardSize: parsed.boardSize ?? DEFAULT_BOARD_SIZE,
     players: Array.isArray(parsed.players) ? parsed.players : [],
     properties: parsed.properties ?? base.properties,
     log: Array.isArray(parsed.log) ? parsed.log : [],

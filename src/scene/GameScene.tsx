@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { MOUSE, TOUCH } from 'three'
-import { BoardMesh } from './Board'
+import { BoardMesh, getBoardMetrics } from './Board'
 import { CameraFocusController } from './CameraFocusController'
 import { STEP_DURATION, Tokens } from './Tokens'
 import { DiceTray } from './Dice'
@@ -43,6 +43,8 @@ export function GameScene() {
   const [actionArmed, setActionArmed] = useState(false)
 
   const properties = useGameStore((s) => s.state.properties)
+  const board = useGameStore((s) => s.state.board)
+  const boardLength = board.length
 
   const highlightIndex = useGameStore((s) => {
     if (s.state.phase === 'lobby' || s.state.players.length === 0) return null
@@ -88,13 +90,14 @@ export function GameScene() {
       const state = useGameStore.getState().state
       const player = state.players[state.currentPlayerIndex]
       const steps = state.lastDice?.value ?? 0
+      const len = state.board.length
       if (!player || player.bankrupt || steps <= 0) {
         setActionArmed(false)
         return
       }
       setActionArmed(false)
       expectArrivalAfter.current = useCameraStore.getState().arrivalSeq
-      const startTile = (player.position - steps + 40) % 40
+      const startTile = (player.position - steps + len) % len
       focusPlayer(player.id, startTile)
       return
     }
@@ -170,12 +173,14 @@ export function GameScene() {
       <hemisphereLight args={['#c8d8ff', '#3a2a1a', 0.4]} />
 
       <BoardMesh
+        board={board}
         highlightIndex={highlightIndex}
         properties={properties}
         players={players}
       />
       <Tokens
         players={players}
+        boardLength={boardLength}
         movingPlayerId={movingPlayerId}
         moveSteps={moveSteps}
         moveActive={moveActive}
@@ -185,6 +190,7 @@ export function GameScene() {
       {inGame && (
         <Suspense fallback={null}>
           <DiceTray
+            boardHalf={getBoardMetrics(boardLength).half}
             rollId={logSeq}
             rolling={rollingActive}
             displayValue={lastDice?.value ?? 1}
@@ -212,7 +218,7 @@ export function GameScene() {
         maxDistance={200}
         // 不要每帧传入 target，否则状态更新会把镜头拽回原点
       />
-      <CameraFocusController players={players} />
+      <CameraFocusController players={players} boardLength={boardLength} />
     </Canvas>
   )
 }

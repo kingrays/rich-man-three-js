@@ -1,18 +1,24 @@
 import {
   BOARD,
+  DEFAULT_BOARD_SIZE,
   GO_SALARY,
   JAIL_FINE,
-  JAIL_POSITION,
   MAX_HOTELS,
   MAX_HOUSES,
   STARTING_CASH,
+  colorGroupTileIds,
+  findJailPosition,
+  generateBoard,
+  getBoardSizeOption,
   getTile,
+  type BoardSizeId,
 } from './board'
 import { CHANCE_CARDS, CHEST_CARDS, getCard } from './cards'
 import type {
   AuctionState,
   GameAction,
   GameState,
+  MoveSlot,
   Player,
   PropertyState,
   TradeOffer,
@@ -41,9 +47,9 @@ export function setRng(next: Rng) {
   rng = next
 }
 
-function initialProperties(): Record<number, PropertyState> {
+function initialProperties(board: GameState['board']): Record<number, PropertyState> {
   const props: Record<number, PropertyState> = {}
-  for (const tile of BOARD) {
+  for (const tile of board) {
     if (
       tile.type === 'property' ||
       tile.type === 'railroad' ||
@@ -55,12 +61,37 @@ function initialProperties(): Record<number, PropertyState> {
   return props
 }
 
+/** 解析机会卡「前进到某类格子」的目标位置 */
+function resolveMoveSlot(state: GameState, slot: MoveSlot): number {
+  const board = state.board
+  if (slot === 'go') return 0
+  const props = board.filter((t) => t.type === 'property')
+  if (slot === 'earlyProperty') {
+    return props[Math.floor(props.length * 0.25)]?.id ?? props[0]?.id ?? 0
+  }
+  if (slot === 'midProperty') {
+    return props[Math.floor(props.length * 0.55)]?.id ?? props[0]?.id ?? 0
+  }
+  if (slot === 'topProperty') {
+    return props[props.length - 1]?.id ?? 0
+  }
+  const rail = board.find((t) => t.type === 'railroad')
+  return rail?.id ?? 0
+}
+
+function describeMoveSlot(state: GameState, slot: MoveSlot): string {
+  const id = resolveMoveSlot(state, slot)
+  return getTile(state, id).name
+}
+
 export function createLobbyState(): GameState {
   return {
     phase: 'lobby',
+    board: BOARD,
+    boardSize: DEFAULT_BOARD_SIZE,
     players: [],
     currentPlayerIndex: 0,
-    properties: initialProperties(),
+    properties: initialProperties(BOARD),
     chanceDeck: [],
     chestDeck: [],
     chanceDiscard: [],
@@ -99,6 +130,9 @@ function startGame(
   }
   const startingCash = clampMoney(action.startingCash, STARTING_CASH)
   const goSalary = clampMoney(action.goSalary, GO_SALARY)
+  const boardSize: BoardSizeId = action.boardSize ?? DEFAULT_BOARD_SIZE
+  const board = generateBoard(boardSize, rng)
+  const sizeLabel = getBoardSizeOption(boardSize).label
   const gamePlayers: Player[] = players.map((p, i) => ({
     id: i,
     name: p.name || `玩家${i + 1}`,
@@ -115,6 +149,9 @@ function startGame(
   let next: GameState = {
     ...createLobbyState(),
     phase: 'waitingRoll',
+    board,
+    boardSize,
+    properties: initialProperties(board),
     players: gamePlayers,
     startingCash,
     goSalary,
@@ -129,7 +166,7 @@ function startGame(
   }
   next = addLog(
     next,
-    `游戏开始！共 ${gamePlayers.length} 名玩家。开局 $${startingCash}，过起点 $${goSalary}。`,
+    `游戏开始！${sizeLabel}，共 ${gamePlayers.length} 名玩家。开局 $${startingCash}，过起点 $${goSalary}。北上广深为本局常驻高价城市。`,
   )
   return next
 }
@@ -169,7 +206,7 @@ function giveMoney(state: GameState, playerId: number, amount: number): GameStat
 
 function sendToJail(state: GameState, playerId: number): GameState {
   let next = updatePlayer(state, playerId, {
-    position: JAIL_POSITION,
+    position: findJailPosition(state.board),
     inJail: true,
     jailTurns: 0,
     consecutiveDoubles: 0,
@@ -180,6 +217,10 @@ function sendToJail(state: GameState, playerId: number): GameState {
   return next
 }
 
+function boardLen(state: GameState): number {
+  return state.board.length
+}
+
 function movePlayer(
   state: GameState,
   playerId: number,
@@ -187,15 +228,16 @@ function movePlayer(
   collectGo: boolean,
 ): GameState {
   const p = getPlayer(state, playerId)
+  const len = boardLen(state)
   let pos = p.position + steps
   let next = state
-  if (pos >= 40 && collectGo) {
+  if (pos >= len && collectGo) {
     const salary = next.goSalary
     next = giveMoney(next, playerId, salary)
     next = addLog(next, `${p.name} 经过起点，领取 $${salary}`)
   }
-  if (pos < 0) pos += 40
-  pos = pos % 40
+  if (pos < 0) pos += len
+  pos = ((pos % len) + len) % len
   next = updatePlayer(next, playerId, { position: pos })
   return next
 }
@@ -226,7 +268,7 @@ function startAuction(state: GameState, tileId: number): GameState {
     activeBidderIds: active,
     currentBidderIndex: 0,
   }
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   return addLog(
     {
       ...state,
@@ -240,8 +282,8 @@ function startAuction(state: GameState, tileId: number): GameState {
 
 function resolveLanding(state: GameState): GameState {
   const player = currentPlayer(state)
-  const tile = getTile(player.position)
-  // 每次落地先清空旧机会，仅在停靠可建自家街道时再授予一次
+  const tile = getTile(state, player.position)
+  // 每次落地先清空旧机会，仅在停靠可建自家城市时再授予一次
   let next: GameState = {
     ...state,
     phase: 'tileAction',
@@ -289,7 +331,7 @@ function resolveLanding(state: GameState): GameState {
 
   if (ps.ownerId === player.id) {
     next = addLog(next, `${player.name} 停在自己的 ${tile.name}`)
-    // 停靠自家街道：本回合仅一次建房机会
+    // 停靠自家城市：本回合仅一次建房机会
     if (isBuildEligible(next, player.id, tile.id)) {
       next = { ...next, landingBuildTileId: tile.id }
       const cost = tile.houseCost ?? 0
@@ -384,6 +426,15 @@ function applyCardEffect(state: GameState, cardId: string): GameState {
       // 落地结算在 dismiss 后
       return next
     }
+    case 'moveToSlot': {
+      const target = resolveMoveSlot(next, effect.slot)
+      const destName = describeMoveSlot(next, effect.slot)
+      const text = `前进到${destName}。`
+      next = moveToPosition(next, player.id, target, effect.collectGo !== false)
+      next = { ...next, lastCardText: text, phase: 'tileAction' }
+      next = addLog(next, `${player.name} 前往 ${destName}`)
+      return next
+    }
     case 'moveSteps': {
       next = movePlayer(next, player.id, effect.steps, effect.steps > 0)
       next = { ...next, lastCardText: card.text, phase: 'tileAction' }
@@ -412,10 +463,9 @@ function applyCardEffect(state: GameState, cardId: string): GameState {
       return next
     }
     case 'nearestRailroad': {
-      const railroads = [5, 15, 25, 35]
+      const railroads = colorGroupTileIds(next.board, 'railroad')
       const pos = player.position
-      const target =
-        railroads.find((r) => r > pos) ?? railroads[0]!
+      const target = railroads.find((r) => r > pos) ?? railroads[0]!
       next = moveToPosition(next, player.id, target, true)
       const ps = next.properties[target]!
       if (ps.ownerId !== null && ps.ownerId !== player.id && !ps.mortgaged) {
@@ -430,7 +480,7 @@ function applyCardEffect(state: GameState, cardId: string): GameState {
       return next
     }
     case 'nearestUtility': {
-      const utils = [12, 28]
+      const utils = colorGroupTileIds(next.board, 'utility')
       const pos = player.position
       const target = utils.find((u) => u > pos) ?? utils[0]!
       next = moveToPosition(next, player.id, target, true)
@@ -466,7 +516,7 @@ function dismissCard(state: GameState): GameState {
 
   // 移动类卡牌落地结算
   const player = currentPlayer(next)
-  const tile = getTile(player.position)
+  const tile = getTile(next, player.position)
   if (
     tile.type === 'property' ||
     tile.type === 'railroad' ||
@@ -557,7 +607,7 @@ function finishMove(state: GameState): GameState {
 function buyProperty(state: GameState): GameState {
   if (state.pendingPurchaseTileId === null) return state
   const tileId = state.pendingPurchaseTileId
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   const player = currentPlayer(state)
   const price = tile.price ?? 0
   if (player.cash < price) {
@@ -584,7 +634,7 @@ function declineProperty(state: GameState): GameState {
 function confirmPayRent(state: GameState): GameState {
   if (!state.pendingRent || state.phase !== 'tileAction') return state
   const { tileId, amount, creditorId } = state.pendingRent
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   const player = currentPlayer(state)
   let next: GameState = { ...state, pendingRent: null }
   next = tryPay(next, player.id, amount, creditorId, `${tile.name} 租金`)
@@ -680,7 +730,7 @@ function finishAuction(
   bid: number,
 ): GameState {
   const tileId = state.auction!.tileId
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   let next: GameState = { ...state, auction: null, phase: 'manageAssets' }
   if (winnerId === null || bid <= 0) {
     next = addLog(next, `${tile.name} 流拍，仍归银行`)
@@ -704,7 +754,7 @@ function buildHouse(state: GameState, tileId: number): GameState {
   if (!canBuildHouse(state, player.id, tileId)) {
     return addLog(state, '无法在此处建房')
   }
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   const ps = state.properties[tileId]!
   let next = updatePlayer(state, player.id, {
     cash: player.cash - (tile.houseCost ?? 0),
@@ -733,7 +783,7 @@ function sellHouse(state: GameState, tileId: number): GameState {
   if (!canSellHouse(state, player.id, tileId)) {
     return addLog(state, '无法出售房屋')
   }
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   const ps = state.properties[tileId]!
   const refund = Math.floor((tile.houseCost ?? 0) / 2)
   let next = giveMoney(state, player.id, refund)
@@ -757,7 +807,7 @@ function mortgage(state: GameState, tileId: number): GameState {
   const actorId =
     state.phase === 'debt' && state.debt ? state.debt.debtorId : currentPlayer(state).id
   const player = getPlayer(state, actorId)
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   const ps = state.properties[tileId]!
   if (ps.ownerId !== player.id || ps.mortgaged) {
     return addLog(state, '无法抵押')
@@ -776,7 +826,7 @@ function unmortgage(state: GameState, tileId: number): GameState {
   const actorId =
     state.phase === 'debt' && state.debt ? state.debt.debtorId : currentPlayer(state).id
   const player = getPlayer(state, actorId)
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   const ps = state.properties[tileId]!
   if (ps.ownerId !== player.id || !ps.mortgaged) {
     return addLog(state, '无法赎回')
@@ -847,7 +897,7 @@ function declareBankruptcy(state: GameState): GameState {
       const ps = next.properties[tileId]!
       // 有房屋先半价卖给银行
       if (ps.houses > 0) {
-        const tile = getTile(tileId)
+        const tile = getTile(state, tileId)
         const refund =
           ps.houses === 5
             ? Math.floor((tile.houseCost ?? 0) / 2) * 5

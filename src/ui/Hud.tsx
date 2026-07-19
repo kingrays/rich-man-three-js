@@ -113,7 +113,7 @@ export function ActionBar() {
   if (state.phase === 'gameOver') return null
 
   // 停在自家地产且该格可建房时，给出醒目提醒
-  const standTile = getTile(player.position)
+  const standTile = getTile(state, player.position)
   const standPs = state.properties[player.position]
   const canBuildHere =
     state.phase === 'manageAssets' &&
@@ -250,7 +250,7 @@ function PropertyManage() {
         地产管理
       </div>
       {props.map((id) => {
-        const tile = getTile(id)
+        const tile = getTile(state, id)
         const ps = state.properties[id]!
         const canBuild = canBuildHouse(state, playerId, id)
         const canSell = canSellHouse(state, playerId, id)

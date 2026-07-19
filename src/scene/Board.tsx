@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import { CanvasTexture, type Texture } from 'three'
-import { BOARD } from '../game/board'
 import type { Player, PropertyState, TileDef } from '../game/types'
 import { useUiStore } from '../store/uiStore'
 import {
@@ -24,52 +23,67 @@ const FLASH_MS = 280
 export const CORNER = 1.6
 export const EDGE_W = 0.95
 export const EDGE_D = 1.4
-export const BOARD_SIDE = CORNER * 2 + EDGE_W * 9
-export const BOARD_HALF = BOARD_SIDE / 2
 /** 棋盘表面高度（格子顶面） */
 export const BOARD_SURFACE_Y = 0.15
 
-const SIDE = BOARD_SIDE
-const HALF = BOARD_HALF
 const TILE_H = 0.12
+
+/** 由总格数计算棋盘几何参数 */
+export function getBoardMetrics(boardLength: number) {
+  const edgeCount = boardLength / 4 - 1
+  const side = CORNER * 2 + EDGE_W * edgeCount
+  const half = side / 2
+  /** 每边格数（含该边起点角格） */
+  const sideLen = boardLength / 4
+  return { edgeCount, side, half, sideLen }
+}
+
+/** 默认大号棋盘尺寸（兼容骰子等未传参场景） */
+export const BOARD_SIDE = getBoardMetrics(40).side
+export const BOARD_HALF = getBoardMetrics(40).half
 
 /**
  * 格子中心世界坐标。
  * 0=起点(右下角)，逆时针：底边← 左边↑ 顶边→ 右边↓
  */
-export function tileWorldPosition(index: number): [number, number, number] {
-  const side = Math.floor(index / 10)
-  const i = index % 10
+export function tileWorldPosition(
+  index: number,
+  boardLength = 40,
+): [number, number, number] {
+  const { half, sideLen } = getBoardMetrics(boardLength)
+  const side = Math.floor(index / sideLen)
+  const i = index % sideLen
   const y = 0.08
 
   if (side === 0) {
-    if (i === 0) return [HALF - CORNER / 2, y, HALF - CORNER / 2]
-    const x = HALF - CORNER - EDGE_W * (i - 0.5)
-    return [x, y, HALF - EDGE_D / 2]
+    if (i === 0) return [half - CORNER / 2, y, half - CORNER / 2]
+    const x = half - CORNER - EDGE_W * (i - 0.5)
+    return [x, y, half - EDGE_D / 2]
   }
   if (side === 1) {
-    if (i === 0) return [-(HALF - CORNER / 2), y, HALF - CORNER / 2]
-    const z = HALF - CORNER - EDGE_W * (i - 0.5)
-    return [-(HALF - EDGE_D / 2), y, z]
+    if (i === 0) return [-(half - CORNER / 2), y, half - CORNER / 2]
+    const z = half - CORNER - EDGE_W * (i - 0.5)
+    return [-(half - EDGE_D / 2), y, z]
   }
   if (side === 2) {
-    if (i === 0) return [-(HALF - CORNER / 2), y, -(HALF - CORNER / 2)]
-    const x = -(HALF - CORNER) + EDGE_W * (i - 0.5)
-    return [x, y, -(HALF - EDGE_D / 2)]
+    if (i === 0) return [-(half - CORNER / 2), y, -(half - CORNER / 2)]
+    const x = -(half - CORNER) + EDGE_W * (i - 0.5)
+    return [x, y, -(half - EDGE_D / 2)]
   }
-  if (i === 0) return [HALF - CORNER / 2, y, -(HALF - CORNER / 2)]
-  const z = -(HALF - CORNER) + EDGE_W * (i - 0.5)
-  return [HALF - EDGE_D / 2, y, z]
+  if (i === 0) return [half - CORNER / 2, y, -(half - CORNER / 2)]
+  const z = -(half - CORNER) + EDGE_W * (i - 0.5)
+  return [half - EDGE_D / 2, y, z]
 }
 
-function tileSize(index: number): [number, number, number] {
-  if (index % 10 === 0) return [CORNER * 0.96, TILE_H, CORNER * 0.96]
-  const side = Math.floor(index / 10)
+function tileSize(index: number, boardLength: number): [number, number, number] {
+  const { sideLen } = getBoardMetrics(boardLength)
+  if (index % sideLen === 0) return [CORNER * 0.96, TILE_H, CORNER * 0.96]
+  const side = Math.floor(index / sideLen)
   if (side === 0 || side === 2) return [EDGE_W * 0.9, TILE_H, EDGE_D * 0.94]
   return [EDGE_D * 0.94, TILE_H, EDGE_W * 0.9]
 }
 
-/** 街道等地产：暖色羊皮纸标签 */
+/** 城市等地产：暖色羊皮纸标签 */
 function createTileLabelTexture(title: string, subtitle?: string): Texture {
   const w = 512
   const h = 512
@@ -117,7 +131,7 @@ function createTileLabelTexture(title: string, subtitle?: string): Texture {
 }
 
 /**
- * 公用事业专用标签：冷色钢板 + 网格，与街道羊皮纸明显区分
+ * 公用事业专用标签：冷色钢板 + 网格，与城市羊皮纸明显区分
  * @param accent 电力偏琥珀 / 水务偏青蓝
  */
 function createUtilityLabelTexture(
@@ -304,7 +318,7 @@ function baseTileColor(tile: TileDef): string {
       return '#3a7ebd'
     case 'tax':
       return '#7a4fa0'
-    // 公用事业：冷钢色，与街道羊皮纸区分
+    // 公用事业：冷钢色，与城市羊皮纸区分
     case 'utility':
       return tile.id === 12 ? '#4a5560' : '#3d5a68'
     // 铁路：深炭暖灰，有别于公用事业冷钢
@@ -320,13 +334,16 @@ function TileBlock({
   highlight,
   prop,
   owner,
+  boardLength,
 }: {
   tile: TileDef
   highlight: boolean
   prop?: PropertyState
   owner?: Player | null
+  /** 本局总格数，用于坐标与朝向 */
+  boardLength: number
 }) {
-  const size = tileSize(tile.id)
+  const size = tileSize(tile.id, boardLength)
   const owned = prop?.ownerId != null
   const mortgaged = !!prop?.mortgaged
   const houses = prop?.houses ?? 0
@@ -343,12 +360,12 @@ function TileBlock({
     if (tile.price) sub = `$${tile.price}`
     if (tile.type === 'tax') sub = `$${tile.taxAmount}`
     if (tile.type === 'go') sub = '领取 $200'
-    // 公用事业 / 铁路用专属标签，与街道羊皮纸区分
+    // 公用事业 / 铁路用专属标签，与城市羊皮纸区分
     if (tile.type === 'utility') {
       return createUtilityLabelTexture(
         tile.name,
         sub,
-        tile.id === 12 ? 'electric' : 'water',
+        tile.name.includes('电') ? 'electric' : 'water',
       )
     }
     if (tile.type === 'railroad') {
@@ -364,7 +381,7 @@ function TileBlock({
   const isSpecialLot = isUtility || isRailroad
   const accentColor = isRailroad
     ? '#d4a84b'
-    : tile.id === 12
+    : tile.name.includes('电')
       ? '#e8b84a'
       : '#4ec4d9'
 
@@ -389,7 +406,7 @@ function TileBlock({
         ? '#c4a35a'
         : '#000000'
   const emissiveIntensity = flash ? 0.7 : highlight ? 0.35 : hovered ? 0.18 : 0
-  const side = Math.floor(tile.id / 10)
+  const side = Math.floor(tile.id / (boardLength / 4))
   const bodyY = lift + pressDip
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
@@ -422,7 +439,7 @@ function TileBlock({
   }
 
   return (
-    <group position={tileWorldPosition(tile.id)}>
+    <group position={tileWorldPosition(tile.id, boardLength)}>
       <mesh position={[0, -0.02, 0]} receiveShadow>
         <boxGeometry args={[size[0] * 1.04, 0.04, size[2] * 1.04]} />
         <meshStandardMaterial
@@ -466,7 +483,7 @@ function TileBlock({
         />
       )}
 
-      <group rotation={[0, labelYaw(tile.id), 0]}>
+      <group rotation={[0, labelYaw(tile.id, boardLength), 0]}>
         <mesh
           position={[0, topY + bodyY + 0.008, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
@@ -479,7 +496,7 @@ function TileBlock({
           }}
           onPointerOut={onPointerOut}
         >
-          <planeGeometry args={labelPlaneSize(tile.id, size)} />
+          <planeGeometry args={labelPlaneSize(tile.id, size, boardLength)} />
           <meshStandardMaterial
             map={label}
             roughness={isSpecialLot ? 0.55 : 0.88}
@@ -501,12 +518,12 @@ function TileBlock({
       )}
       {tile.type === 'utility' && (
         <UtilityModel
-          kind={tile.id === 12 ? 'electric' : 'water'}
+          kind={tile.name.includes('电') ? 'electric' : 'water'}
           position={edgeIconPos(side, size, bodyY, topY)}
         />
       )}
 
-      {/* 街道空地契立牌；铁路/公用事业已有专属模型，不再叠立牌 */}
+      {/* 城市空地契立牌；铁路/公用事业已有专属模型，不再叠立牌 */}
       {owned &&
         owner &&
         houses === 0 &&
@@ -515,7 +532,7 @@ function TileBlock({
         <DeedMarker
           color={owner.color}
           position={edgeIconPos(side, size, bodyY, topY)}
-          yaw={labelYaw(tile.id)}
+          yaw={labelYaw(tile.id, boardLength)}
         />
       )}
 
@@ -590,8 +607,8 @@ function SpecialLotAccentFrame({
  * - 顶边(2)：盘心 +Z → yaw π
  * - 右边(3)：盘心 -X → yaw π/2
  */
-function labelYaw(index: number): number {
-  const side = Math.floor(index / 10)
+function labelYaw(index: number, boardLength: number): number {
+  const side = Math.floor(index / (boardLength / 4))
   if (side === 0) return 0
   if (side === 1) return -Math.PI / 2
   if (side === 2) return Math.PI
@@ -606,8 +623,9 @@ function labelYaw(index: number): number {
 function labelPlaneSize(
   index: number,
   size: [number, number, number],
+  boardLength: number,
 ): [number, number] {
-  const side = Math.floor(index / 10)
+  const side = Math.floor(index / (boardLength / 4))
   if (side === 0 || side === 2) {
     // size: [沿边, 高, 径向]
     return [size[0] * 0.84, size[2] * 0.48]
@@ -617,6 +635,7 @@ function labelPlaneSize(
 }
 
 interface BoardMeshProps {
+  board: TileDef[]
   highlightIndex: number | null
   properties: Record<number, PropertyState>
   players: Player[]
@@ -902,15 +921,17 @@ function BoardCenterPlaza({ size }: { size: number }) {
   )
 }
 
-export function BoardMesh({ highlightIndex, properties, players }: BoardMeshProps) {
+export function BoardMesh({ board, highlightIndex, properties, players }: BoardMeshProps) {
   const playerById = useMemo(() => {
     const m = new Map<number, Player>()
     for (const p of players) m.set(p.id, p)
     return m
   }, [players])
 
-  const inner = SIDE - CORNER * 2 + 0.15
-  const frame = SIDE + 0.55
+  const boardLength = board.length
+  const { side: boardSide } = getBoardMetrics(boardLength)
+  const inner = boardSide - CORNER * 2 + 0.15
+  const frame = boardSide + 0.55
 
   return (
     <group>
@@ -921,13 +942,13 @@ export function BoardMesh({ highlightIndex, properties, players }: BoardMeshProp
       </mesh>
       {/* 木框内沿 */}
       <mesh position={[0, 0.01, 0]} receiveShadow>
-        <boxGeometry args={[SIDE + 0.2, 0.06, SIDE + 0.2]} />
+        <boxGeometry args={[boardSide + 0.2, 0.06, boardSide + 0.2]} />
         <meshStandardMaterial color="#6b4a32" roughness={0.8} />
       </mesh>
 
       <BoardCenterPlaza size={inner} />
 
-      {BOARD.map((tile) => {
+      {board.map((tile) => {
         const prop = properties[tile.id]
         const owner =
           prop?.ownerId != null ? playerById.get(prop.ownerId) ?? null : null
@@ -935,6 +956,7 @@ export function BoardMesh({ highlightIndex, properties, players }: BoardMeshProp
           <TileBlock
             key={tile.id}
             tile={tile}
+            boardLength={boardLength}
             highlight={highlightIndex === tile.id}
             prop={prop}
             owner={owner}

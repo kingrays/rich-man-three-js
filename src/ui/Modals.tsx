@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { COLOR_GROUP_TILES, getTile } from '../game/board'
+import { colorGroupTileIds, getTile } from '../game/board'
 import { calcPropertyRent, getPlayer } from '../game/rules/helpers'
 import type { TileDef, TileType } from '../game/types'
 import { useGameStore } from '../store/gameStore'
@@ -7,7 +7,7 @@ import { useUiStore } from '../store/uiStore'
 
 const TILE_TYPE_LABEL: Record<TileType, string> = {
   go: '起点',
-  property: '街道地产',
+  property: '城市地产',
   railroad: '铁路',
   utility: '公用事业',
   tax: '税收',
@@ -27,7 +27,7 @@ export function PurchaseModal() {
   }
   if (state.lastCardText || state.pendingRent) return null
 
-  const tile = getTile(state.pendingPurchaseTileId)
+  const tile = getTile(state, state.pendingPurchaseTileId)
   const player = state.players[state.currentPlayerIndex]!
 
   return (
@@ -71,7 +71,7 @@ export function RentModal() {
   if (state.lastCardText) return null
 
   const { tileId, amount, creditorId } = state.pendingRent
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   const player = state.players[state.currentPlayerIndex]!
   const owner = getPlayer(state, creditorId)
   const canAfford = player.cash >= amount
@@ -143,7 +143,7 @@ export function AuctionModal() {
   const bidderId = auction.activeBidderIds[auction.currentBidderIndex]
   if (bidderId === undefined) return null
   const bidder = getPlayer(state, bidderId)
-  const tile = getTile(auction.tileId)
+  const tile = getTile(state, auction.tileId)
   const minBid = auction.highestBid + 1
 
   return (
@@ -302,7 +302,7 @@ export function TradeModal() {
                   checked={trade.propertiesFrom.includes(id)}
                   onChange={() => toggleProp('from', id)}
                 />
-                {getTile(id).name}
+                {getTile(state, id).name}
               </label>
             ))}
           </div>
@@ -351,7 +351,7 @@ export function TradeModal() {
                   checked={trade.propertiesTo.includes(id)}
                   onChange={() => toggleProp('to', id)}
                 />
-                {getTile(id).name}
+                {getTile(state, id).name}
               </label>
             ))}
           </div>
@@ -384,14 +384,14 @@ function TradeSummary() {
         {from.name}：现金 ${trade.cashFrom}
         {trade.jailCardsFrom ? `、出狱卡×${trade.jailCardsFrom}` : ''}
         {trade.propertiesFrom.length
-          ? `、${trade.propertiesFrom.map((id) => getTile(id).name).join('、')}`
+          ? `、${trade.propertiesFrom.map((id) => getTile(state, id).name).join('、')}`
           : ''}
       </p>
       <p>
         {to.name}：现金 ${trade.cashTo}
         {trade.jailCardsTo ? `、出狱卡×${trade.jailCardsTo}` : ''}
         {trade.propertiesTo.length
-          ? `、${trade.propertiesTo.map((id) => getTile(id).name).join('、')}`
+          ? `、${trade.propertiesTo.map((id) => getTile(state, id).name).join('、')}`
           : ''}
       </p>
     </div>
@@ -430,7 +430,7 @@ export function TileInfoModal() {
 
   if (tileId === null) return null
 
-  const tile = getTile(tileId)
+  const tile = getTile(state, tileId)
   const prop = state.properties[tileId]
   const owner =
     prop?.ownerId != null
@@ -493,7 +493,7 @@ function describeTileSituation(tile: TileDef, goSalary: number): string {
     case 'go':
       return `经过或停在此处可领取 $${goSalary}。`
     case 'property':
-      return '可购买的街道地产。他人停靠需付租金；可建房提高租金。'
+      return '可购买的城市地产。他人停靠需付租金；可建房提高租金。'
     case 'railroad':
       return '铁路地产。拥有的铁路越多，租金越高。'
     case 'utility':
@@ -601,7 +601,7 @@ function TileEconomyBlock({
   if (tile.type === 'railroad' && tile.price != null && tile.rent) {
     const ownedCount =
       prop?.ownerId != null
-        ? COLOR_GROUP_TILES.railroad!.filter(
+        ? colorGroupTileIds(state.board, 'railroad').filter(
             (id) =>
               state.properties[id]?.ownerId === prop.ownerId &&
               !state.properties[id]?.mortgaged,
@@ -647,7 +647,7 @@ function TileEconomyBlock({
   if (tile.type === 'utility' && tile.price != null && tile.rent) {
     const ownedCount =
       prop?.ownerId != null
-        ? COLOR_GROUP_TILES.utility!.filter(
+        ? colorGroupTileIds(state.board, 'utility').filter(
             (id) =>
               state.properties[id]?.ownerId === prop.ownerId &&
               !state.properties[id]?.mortgaged,

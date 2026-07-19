@@ -62,17 +62,16 @@ describe('游戏引擎', () => {
       startingCash: 1000,
       goSalary: 50,
     })
+    const len = s.board.length
     s = {
       ...s,
       players: s.players.map((p, i) =>
-        i === 0 ? { ...p, position: 38 } : p,
+        i === 0 ? { ...p, position: len - 2 } : p,
       ),
       phase: 'moving',
       lastDice: { value: 4 },
     }
-    // finishMove 会先结算落地；这里直接测 move 路径：先 FINISH 需在 moving 且走完
-    // 用 FINISH_ROLL 触发移动更贴近流程，但点数已被 lastDice 固定——改为手动推进：
-    // position 38 + 4 = 42 → 过起点到 2，应领取 $50
+    // 倒数第 2 格 + 4 → 过起点到格 2，应领取 $50
     s = {
       ...s,
       phase: 'waitingRoll',
@@ -82,6 +81,26 @@ describe('游戏引擎', () => {
     expect(s.players[0]!.position).toBe(2)
     expect(s.players[0]!.cash).toBe(1050)
     expect(s.log.some((e) => e.message.includes('领取 $50'))).toBe(true)
+  })
+
+  it('可选棋盘大小，且北上广深常驻最高价', () => {
+    const s = reduce(createLobbyState(), {
+      type: 'START_GAME',
+      boardSize: 'mini',
+      players: [
+        { name: '甲', color: '#e74c3c', animalKind: 'pig' },
+        { name: '乙', color: '#3498db', animalKind: 'cat' },
+      ],
+    })
+    expect(s.board).toHaveLength(24)
+    expect(s.boardSize).toBe('mini')
+    const props = s.board.filter((t) => t.type === 'property')
+    const names = props.map((t) => t.name)
+    for (const city of ['北京', '上海', '广州', '深圳']) {
+      expect(names).toContain(city)
+    }
+    const top = [...props].sort((a, b) => (b.price ?? 0) - (a.price ?? 0)).slice(0, 4)
+    expect(top.map((t) => t.name).sort()).toEqual(['上海', '北京', '广州', '深圳'].sort())
   })
 
   it('掷骰后进入 rolling，物理点数结算后移动', () => {
@@ -98,7 +117,8 @@ describe('游戏引擎', () => {
 
   it('购买无人地产', () => {
     let s = startTwoPlayer()
-    // 强制放到地中海大道
+    // 强制放到第一格城市地产
+    const price = s.board[1]!.price!
     s = {
       ...s,
       players: s.players.map((p, i) =>
@@ -111,7 +131,7 @@ describe('游戏引擎', () => {
     expect(s.pendingPurchaseTileId).toBe(1)
     s = reduce(s, { type: 'BUY_PROPERTY' })
     expect(s.properties[1]!.ownerId).toBe(0)
-    expect(s.players[0]!.cash).toBe(1500 - 60)
+    expect(s.players[0]!.cash).toBe(1500 - price)
     expect(s.phase).toBe('manageAssets')
   })
 
@@ -271,14 +291,17 @@ describe('游戏引擎', () => {
 
   it('铁路租金随持有数量增加', () => {
     let s = startTwoPlayer()
+    const rails = s.board.filter((t) => t.type === 'railroad').map((t) => t.id)
+    expect(rails.length).toBeGreaterThanOrEqual(2)
+    const [r0, r1] = rails
     s = {
       ...s,
       properties: {
         ...s.properties,
-        5: { ownerId: 0, houses: 0, mortgaged: false },
-        15: { ownerId: 0, houses: 0, mortgaged: false },
+        [r0!]: { ownerId: 0, houses: 0, mortgaged: false },
+        [r1!]: { ownerId: 0, houses: 0, mortgaged: false },
       },
     }
-    expect(calcPropertyRent(s, 5)).toBe(50)
+    expect(calcPropertyRent(s, r0!)).toBe(50)
   })
 })
