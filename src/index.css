@@ -1,0 +1,517 @@
+:root {
+  --bg: #1a2332;
+  --panel: rgba(12, 20, 32, 0.92);
+  --panel-border: rgba(212, 175, 55, 0.35);
+  --gold: #d4af37;
+  --gold-bright: #f0d060;
+  --text: #f5f0e6;
+  --muted: #9aa8bc;
+  --danger: #e85d5d;
+  --success: #3ecf8e;
+  --font-display: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-body: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem 1rem;
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  color: #1a1508;
+  font-weight: 600;
+  transition: filter 0.15s, transform 0.1s;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+}
+
+button.danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+input,
+select {
+  font-family: inherit;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(154, 168, 188, 0.28);
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--text);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input:hover,
+select:hover {
+  border-color: rgba(212, 175, 55, 0.45);
+}
+
+input:focus,
+select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.18);
+}
+
+/* 深色细滚动条（Firefox + Chromium） */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 175, 55, 0.45) transparent;
+}
+
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.4);
+  border-radius: 999px;
+}
+
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(240, 208, 96, 0.65);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  padding: 1rem;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 1rem;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  max-width: 420px;
+  width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 175, 55, 0.45) transparent;
+}
+
+.modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.4);
+  border-radius: 999px;
+}
+
+.modal h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.75rem;
+  color: var(--gold-bright);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+/* 租金确认弹窗 */
+.rent-modal__badge {
+  display: inline-block;
+  margin-bottom: 0.55rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #1a1208;
+  background: linear-gradient(180deg, #f0d060, #d4af37);
+}
+
+.rent-modal__lead {
+  margin-bottom: 0.85rem;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.rent-modal__amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(232, 93, 93, 0.45);
+  background: linear-gradient(
+    135deg,
+    rgba(232, 93, 93, 0.22),
+    rgba(212, 175, 55, 0.08)
+  );
+}
+
+.rent-modal__amount-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.rent-modal__amount-value {
+  color: #ff8e8e;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 16px rgba(232, 93, 93, 0.35);
+}
+
+/* 现金滚动与差额飘字 */
+.animated-cash {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.2s;
+}
+
+.animated-cash--down .animated-cash__value {
+  color: #ff8e8e;
+  font-weight: 700;
+}
+
+.animated-cash--up .animated-cash__value {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.animated-cash__delta {
+  position: absolute;
+  left: 100%;
+  margin-left: 0.25rem;
+  top: -0.15rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: cash-delta-fly 0.85s ease-out forwards;
+}
+
+.animated-cash__delta.down {
+  color: #ff8e8e;
+}
+
+.animated-cash__delta.up {
+  color: var(--success);
+}
+
+@keyframes cash-delta-fly {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+/* ——— 开局大厅 ——— */
+.lobby {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(ellipse 80% 55% at 20% 0%, rgba(80, 120, 170, 0.28), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 100%, rgba(212, 175, 55, 0.08), transparent 50%),
+    linear-gradient(165deg, #243448 0%, #1a2332 45%, #0e1520 100%);
+}
+
+.lobby-card {
+  width: min(420px, 100%);
+  max-height: min(92vh, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.25rem 1.25rem 1rem;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(22, 32, 48, 0.96), rgba(12, 18, 28, 0.96));
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+}
+
+.lobby-header {
+  flex-shrink: 0;
+  padding-bottom: 0.15rem;
+}
+
+.lobby-title {
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: var(--gold-bright);
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-shadow: 0 0 24px rgba(240, 208, 96, 0.25);
+}
+
+.lobby-subtitle {
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.lobby-section {
+  flex-shrink: 0;
+}
+
+.lobby-section-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(240, 208, 96, 0.75);
+}
+
+.lobby-field {
+  display: block;
+}
+
+.lobby-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.lobby-money-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.lobby-players {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lobby-players-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-right: 0.25rem;
+  margin-right: -0.1rem;
+}
+
+.lobby-player-card {
+  --player-accent: #e74c3c;
+  padding: 0.7rem 0.75rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 3px solid var(--player-accent);
+}
+
+.lobby-player-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.lobby-player-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--player-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--player-accent) 55%, transparent);
+  flex-shrink: 0;
+}
+
+.lobby-player-role {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.lobby-player-fields {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.lobby-footer {
+  flex-shrink: 0;
+  padding-top: 0.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.lobby-start {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+}
+
+/* 对局内右上角：品牌 + 结束游戏 */
+.game-top-right {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  pointer-events: auto;
+}
+
+.game-brand {
+  font-size: 0.85rem;
+  color: var(--gold-bright);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.game-end-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  border-color: rgba(232, 93, 93, 0.55);
+  color: #f0b0b0;
+  background: rgba(20, 12, 16, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.game-end-btn:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: #fff;
+  background: rgba(232, 93, 93, 0.35);
+  filter: none;
+}
+
+/* 玩家列表：飞往视角 */
+.player-focus-btn {
+  flex-shrink: 0;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  border-color: rgba(212, 175, 55, 0.4);
+  color: var(--gold-bright);
+}
+
+.player-focus-btn:hover:not(:disabled) {
+  border-color: var(--gold-bright);
+  background: rgba(212, 175, 55, 0.15);
+  filter: none;
+}
+
+/* 踩到自家地且可建房时的醒目提示条 */
+.build-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(240, 208, 96, 0.65);
+  background: linear-gradient(
+    135deg,
+    rgba(212, 175, 55, 0.28),
+    rgba(62, 207, 142, 0.12)
+  );
+  animation: build-hint-pulse 1.6s ease-in-out infinite;
+}
+
+.build-hint__text {
+  color: var(--gold-bright);
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+@keyframes build-hint-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(240, 208, 96, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(240, 208, 96, 0);
+  }
+}
