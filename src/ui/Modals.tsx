@@ -374,9 +374,10 @@ export function TradeModal() {
 }
 
 function TradeSummary() {
-  const trade = useGameStore((s) => s.state.trade)!
-  const from = useGameStore((s) => getPlayer(s.state, trade.fromId))
-  const to = useGameStore((s) => getPlayer(s.state, trade.toId))
+  const state = useGameStore((s) => s.state)
+  const trade = state.trade!
+  const from = getPlayer(state, trade.fromId)
+  const to = getPlayer(state, trade.toId)
 
   return (
     <div style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>

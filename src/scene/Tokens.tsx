@@ -108,6 +108,13 @@ function TokenMesh({
     steppingKey.current = key
     arrived.current = false
     visualIndex.current = stepFrom
+    // 立刻对齐起步格并上报，避免相机还停在上一位置
+    syncWorld(stepFrom)
+    syncTokenLivePosition([
+      fromXZ.current.x + ox,
+      FOLLOW_Y,
+      fromXZ.current.z + oz,
+    ])
     queue.current = buildForwardPath(stepFrom, player.position, boardLength)
     if (queue.current.length === 0) {
       syncWorld(player.position)
@@ -120,7 +127,7 @@ function TokenMesh({
     fromXZ.current = { x: fx, z: fz }
     toXZ.current = { x: tx, z: tz }
     progress.current = 0
-  }, [stepping, stepFrom, player.id, player.position, boardLength])
+  }, [stepping, stepFrom, player.id, player.position, boardLength, ox, oz])
 
   useFrame((_, dt) => {
     const g = ref.current
@@ -136,7 +143,7 @@ function TokenMesh({
       g.position.y = TOKEN_Y + hop
 
       if (reportLive) {
-        syncTokenLivePosition(g.position.x, FOLLOW_Y, g.position.z)
+        syncTokenLivePosition([g.position.x, FOLLOW_Y, g.position.z])
       }
 
       if (t >= 1) {
@@ -162,9 +169,9 @@ function TokenMesh({
 
     // 静止时也上报，便于相机落稳
     if (reportLive) {
-      syncTokenLivePosition(g.position.x, FOLLOW_Y, g.position.z)
+      syncTokenLivePosition([g.position.x, FOLLOW_Y, g.position.z])
     }
-  })
+  }, -1) // 优先于相机跟随，先写入棋子坐标
 
   const spawn = tileWorldPosition(player.position, boardLength)
   return (

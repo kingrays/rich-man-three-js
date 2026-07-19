@@ -26,6 +26,12 @@ export function Lobby() {
   const [goSalary, setGoSalary] = useState(GO_SALARY)
   const [boardSize, setBoardSize] = useState<BoardSizeId>(DEFAULT_BOARD_SIZE)
 
+  /** 当前参战玩家已占用的角色（不含指定座位，用于下拉禁用） */
+  const takenKinds = (exceptIndex: number) =>
+    new Set(
+      animals.slice(0, count).filter((_, i) => i !== exceptIndex),
+    )
+
   const start = () => {
     const players = Array.from({ length: count }, (_, i) => ({
       name: names[i] || ANIMAL_LABELS[animals[i]!],
@@ -144,11 +150,15 @@ export function Lobby() {
                         setAnimals(next)
                       }}
                     >
-                      {ANIMAL_KINDS.map((kind) => (
-                        <option key={kind} value={kind}>
-                          {ANIMAL_LABELS[kind]}
-                        </option>
-                      ))}
+                      {ANIMAL_KINDS.map((kind) => {
+                        const taken = takenKinds(i).has(kind)
+                        return (
+                          <option key={kind} value={kind} disabled={taken}>
+                            {ANIMAL_LABELS[kind]}
+                            {taken ? '（已选用）' : ''}
+                          </option>
+                        )
+                      })}
                     </select>
                   </label>
                 </div>

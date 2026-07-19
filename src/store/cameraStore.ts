@@ -19,8 +19,13 @@ export function syncDiceLivePosition(pos: [number, number, number]) {
   diceLiveRef.current = [pos[0], pos[1], pos[2]]
 }
 
+/** 同步走动棋子坐标，供相机跟随（勿传散参，须为三元组） */
 export function syncTokenLivePosition(pos: [number, number, number]) {
-  tokenLiveRef.current = [pos[0], pos[1], pos[2]]
+  const x = pos[0]
+  const y = pos[1]
+  const z = pos[2]
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return
+  tokenLiveRef.current = [x, y, z]
 }
 
 interface CameraStore {

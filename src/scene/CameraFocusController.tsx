@@ -50,8 +50,6 @@ export function CameraFocusController({
 }) {
   const focusSeq = useCameraStore((s) => s.focusSeq)
   const request = useCameraStore((s) => s.request)
-  const followDice = useCameraStore((s) => s.followDice)
-  const followToken = useCameraStore((s) => s.followToken)
   const signalArrival = useCameraStore((s) => s.signalArrival)
   const { camera, controls } = useThree()
   const anim = useRef<FocusAnim | null>(null)
@@ -151,11 +149,16 @@ export function CameraFocusController({
       return
     }
 
-    const k = Math.min(1, dt * 7)
+    // 用 getState 读最新跟随开关，避免渲染时序导致跟丢
+    const { followDice, followToken } = useCameraStore.getState()
 
     // 投掷过程：跟随骰子
     if (followDice) {
       const [dx, dy, dz] = diceLiveRef.current
+      if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(dz)) {
+        return
+      }
+      const k = Math.min(1, dt * 10)
       followTarget.current.set(dx, dy, dz)
       followCam.current.copy(followTarget.current).add(DICE_OFFSET)
       ctrl.target.lerp(followTarget.current, k)
@@ -164,16 +167,27 @@ export function CameraFocusController({
       return
     }
 
-    // 走动过程：跟随棋子，保持当前观察偏移
+    // 走动过程：紧跟棋子（每格仅 0.28s，慢插值会严重滞后）
     if (followToken) {
       const [tx, ty, tz] = tokenLiveRef.current
+      if (!Number.isFinite(tx) || !Number.isFinite(ty) || !Number.isFinite(tz)) {
+        return
+      }
       followTarget.current.set(tx, ty, tz)
       followCam.current.copy(followTarget.current).add(tokenFollowOffset.current)
-      ctrl.target.lerp(followTarget.current, k)
-      camera.position.lerp(followCam.current, k)
+      if (
+        !Number.isFinite(followCam.current.x) ||
+        !Number.isFinite(followCam.current.y) ||
+        !Number.isFinite(followCam.current.z)
+      ) {
+        return
+      }
+      // 直接贴合目标，保证走格子时视角持续跟随
+      ctrl.target.copy(followTarget.current)
+      camera.position.copy(followCam.current)
       ctrl.update()
     }
-  })
+  }) // 优先级须 ≤0；>0 会接管渲染并关闭自动 gl.render，导致棋盘空白
 
   return null
 }

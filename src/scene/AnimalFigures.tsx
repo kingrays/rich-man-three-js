@@ -1,5 +1,6 @@
-/** 棋盘动物棋子：小猪 / 猫 / 兔 / 熊 —— Q 版大头、软材质、精致五官 */
+/** 棋盘动物棋子：小猪 / 猫 / 兔 / 熊 / 青蛙 —— Q 版大头、软材质、精致五官 */
 
+import { Euler, Quaternion, Vector3 } from 'three'
 import {
   ANIMAL_KINDS,
   ANIMAL_LABELS,
@@ -113,42 +114,113 @@ function Smile({ y, z, color = '#c45a70' }: { y: number; z: number; color?: stri
   )
 }
 
-/** 玩家色围巾（蝴蝶结更可爱） */
-function Scarf({ accent, y = 0.3 }: { accent: string; y?: number }) {
+/** 玩家色小旗：原点为握点，杆只向上伸，旗面在顶端 */
+function HandFlag({ accent }: { accent: string }) {
   return (
-    <group position={[0, y, 0]}>
-      <mesh castShadow>
-        <torusGeometry args={[0.09, 0.022, 8, 24]} />
-        <meshPhysicalMaterial color={accent} roughness={0.4} clearcoat={0.5} clearcoatRoughness={0.35} />
+    <group scale={1.45}>
+      {/* 旗杆：从握点向上，不向下延伸以免穿手 */}
+      <mesh position={[0, 0.15, 0]} castShadow>
+        <cylinderGeometry args={[0.009, 0.011, 0.3, 8]} />
+        <meshStandardMaterial color="#a67c52" roughness={0.65} />
       </mesh>
-      {/* 蝴蝶结 */}
-      <mesh position={[0, -0.01, 0.09]} rotation={[0.3, 0, 0]} scale={[1.3, 0.7, 0.5]} castShadow>
-        <sphereGeometry args={[0.028, 10, 10]} />
-        <meshPhysicalMaterial color={accent} roughness={0.4} clearcoat={0.5} clearcoatRoughness={0.35} />
+      <mesh position={[0, 0.305, 0]} castShadow>
+        <sphereGeometry args={[0.015, 8, 8]} />
+        <meshStandardMaterial color="#f0c060" metalness={0.45} roughness={0.35} />
       </mesh>
-      <mesh position={[-0.035, -0.015, 0.085]} rotation={[0.2, 0, 0.5]} scale={[0.9, 0.55, 0.4]} castShadow>
-        <sphereGeometry args={[0.03, 10, 10]} />
-        <meshPhysicalMaterial color={accent} roughness={0.4} clearcoat={0.5} clearcoatRoughness={0.35} />
-      </mesh>
-      <mesh position={[0.035, -0.015, 0.085]} rotation={[0.2, 0, -0.5]} scale={[0.9, 0.55, 0.4]} castShadow>
-        <sphereGeometry args={[0.03, 10, 10]} />
-        <meshPhysicalMaterial color={accent} roughness={0.4} clearcoat={0.5} clearcoatRoughness={0.35} />
+      {/* 旗面在杆顶侧方 */}
+      <mesh position={[0.11, 0.23, 0]} castShadow>
+        <boxGeometry args={[0.2, 0.13, 0.014]} />
+        <meshPhysicalMaterial
+          color={accent}
+          roughness={0.45}
+          metalness={0.04}
+          clearcoat={0.35}
+          clearcoatRoughness={0.4}
+        />
       </mesh>
     </group>
   )
 }
 
 /**
- * Q 版四肢：短粗、带掌垫，整体偏可爱比例
+ * 右臂握旗：肩点 → 手臂胶囊 → 手球 → 旗杆，中心线共线对准球心
+ * 旋转用欧拉角数字元组，避免每帧 new Quaternion 作为 prop 搞崩 R3F
+ */
+function rotationAlignYToDir(
+  from: [number, number, number],
+  to: [number, number, number],
+): [number, number, number] {
+  const dx = to[0] - from[0]
+  const dy = to[1] - from[1]
+  const dz = to[2] - from[2]
+  const len = Math.hypot(dx, dy, dz)
+  if (len < 1e-5) return [0, 0, 0]
+  const q = new Quaternion().setFromUnitVectors(
+    new Vector3(0, 1, 0),
+    new Vector3(dx / len, dy / len, dz / len),
+  )
+  const e = new Euler().setFromQuaternion(q)
+  return [e.x, e.y, e.z]
+}
+
+function FlagArm({
+  from,
+  to,
+  fur,
+  pad,
+  flagColor,
+  armR,
+}: {
+  from: [number, number, number]
+  to: [number, number, number]
+  fur: string
+  pad: string
+  flagColor: string
+  armR: number
+}) {
+  const len = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2])
+  // 胶囊总长约等于肩到手心，末端埋进手球
+  const cylLen = Math.max(0.02, len - armR * 2)
+  const rotation = rotationAlignYToDir(from, to)
+
+  return (
+    <group>
+      <group position={from} rotation={rotation}>
+        <mesh position={[0, len / 2, 0]} castShadow>
+          <capsuleGeometry args={[armR, cylLen, 6, 12]} />
+          <Soft color={fur} />
+        </mesh>
+      </group>
+      {/* 手球在目标点，手臂中心线指向其球心 */}
+      <group position={to}>
+        <mesh castShadow>
+          <sphereGeometry args={[armR * 1.35, 12, 12]} />
+          <Soft color={fur} />
+        </mesh>
+        <mesh position={[0.012, 0, 0.012]} scale={[0.75, 0.55, 0.5]}>
+          <sphereGeometry args={[armR * 1.05, 10, 10]} />
+          <Soft color={pad} rough={0.7} coat={0.15} />
+        </mesh>
+        <HandFlag accent={flagColor} />
+      </group>
+    </group>
+  )
+}
+
+/**
+ * Q 版四肢：短粗、带掌垫；右手举起握旗（肩到手心共线）
  */
 function CuteLimbs({
   fur,
   pad,
+  flagColor,
   thick = false,
   hoof = false,
 }: {
   fur: string
   pad: string
+  /** 右手所握小旗颜色（玩家座位色） */
+  flagColor: string
   thick?: boolean
   hoof?: boolean
 }) {
@@ -171,20 +243,15 @@ function CuteLimbs({
           <Soft color={pad} rough={0.7} coat={0.15} />
         </mesh>
       </group>
-      <group position={[0.125, 0.22, 0.03]} rotation={[0.35, -0.15, -0.65]}>
-        <mesh castShadow>
-          <capsuleGeometry args={[armR, 0.07, 6, 12]} />
-          <Soft color={fur} />
-        </mesh>
-        <mesh position={[0, -0.06, 0.01]} castShadow>
-          <sphereGeometry args={[armR * 1.25, 12, 12]} />
-          <Soft color={fur} />
-        </mesh>
-        <mesh position={[0, -0.06, 0.02]} scale={[0.7, 0.55, 0.45]}>
-          <sphereGeometry args={[armR * 1.1, 10, 10]} />
-          <Soft color={pad} rough={0.7} coat={0.15} />
-        </mesh>
-      </group>
+
+      <FlagArm
+        from={[0.1, 0.26, 0.03]}
+        to={[0.22, 0.36, 0.07]}
+        fur={fur}
+        pad={pad}
+        flagColor={flagColor}
+        armR={armR}
+      />
 
       {/* 短腿 + 圆脚 */}
       <group position={[-0.055, 0.08, 0.01]} rotation={[0.12, 0, 0.06]}>
@@ -262,8 +329,7 @@ function CuteBody({
         <sphereGeometry args={[r * 0.72, 16, 16]} />
         <Soft color={belly} rough={0.6} coat={0.25} />
       </mesh>
-      <Scarf accent={accent} y={0.3} />
-      <CuteLimbs fur={fur} pad={pad} thick={fat} />
+      <CuteLimbs fur={fur} pad={pad} flagColor={accent} thick={fat} />
     </group>
   )
 }
@@ -282,8 +348,7 @@ function PigFigure({ accent }: { accent: string }) {
         <sphereGeometry args={[0.09, 16, 16]} />
         <Soft color="#ffe0e8" rough={0.6} coat={0.2} />
       </mesh>
-      <Scarf accent={accent} y={0.31} />
-      <CuteLimbs fur={fur} pad="#e07088" thick hoof />
+      <CuteLimbs fur={fur} pad="#e07088" flagColor={accent} thick hoof />
 
       {/* 大头 */}
       <mesh position={[0, 0.42, 0.02]} castShadow>
@@ -516,6 +581,106 @@ function BearFigure({ accent }: { accent: string }) {
   )
 }
 
+/** Q 版青蛙：鼓眼、宽嘴、短蹼腿 */
+function FrogFigure({ accent }: { accent: string }) {
+  const skin = '#6bcb77'
+  const belly = '#d4f5c8'
+  const pad = '#4aa35a'
+  return (
+    <group scale={1.12}>
+      {/* 圆润蛙身 */}
+      <mesh position={[0, 0.18, 0]} scale={[1.15, 0.95, 1.05]} castShadow>
+        <sphereGeometry args={[0.125, 20, 20]} />
+        <Soft color={skin} />
+      </mesh>
+      <mesh position={[0, 0.175, 0.07]} scale={[0.9, 0.85, 0.55]}>
+        <sphereGeometry args={[0.09, 16, 16]} />
+        <Soft color={belly} rough={0.6} coat={0.25} />
+      </mesh>
+
+      {/* 左前肢自然下垂 */}
+      <group position={[-0.12, 0.18, 0.04]} rotation={[0.4, 0.2, 0.7]}>
+        <mesh castShadow>
+          <capsuleGeometry args={[0.028, 0.05, 6, 12]} />
+          <Soft color={skin} />
+        </mesh>
+        <mesh position={[0, -0.05, 0.015]} scale={[1.4, 0.55, 1.1]} castShadow>
+          <sphereGeometry args={[0.032, 12, 12]} />
+          <Soft color={pad} rough={0.65} coat={0.2} />
+        </mesh>
+      </group>
+      <FlagArm
+        from={[0.09, 0.22, 0.03]}
+        to={[0.2, 0.32, 0.07]}
+        fur={skin}
+        pad={pad}
+        flagColor={accent}
+        armR={0.028}
+      />
+
+      {/* 粗短后腿 + 大蹼脚 */}
+      <group position={[-0.07, 0.07, 0.01]} rotation={[0.15, 0, 0.12]}>
+        <mesh castShadow>
+          <capsuleGeometry args={[0.04, 0.04, 6, 12]} />
+          <Soft color={skin} />
+        </mesh>
+        <mesh position={[0, -0.05, 0.03]} scale={[1.5, 0.5, 1.35]} castShadow>
+          <sphereGeometry args={[0.038, 12, 12]} />
+          <Soft color={pad} rough={0.65} coat={0.2} />
+        </mesh>
+      </group>
+      <group position={[0.07, 0.07, 0.01]} rotation={[0.15, 0, -0.12]}>
+        <mesh castShadow>
+          <capsuleGeometry args={[0.04, 0.04, 6, 12]} />
+          <Soft color={skin} />
+        </mesh>
+        <mesh position={[0, -0.05, 0.03]} scale={[1.5, 0.5, 1.35]} castShadow>
+          <sphereGeometry args={[0.038, 12, 12]} />
+          <Soft color={pad} rough={0.65} coat={0.2} />
+        </mesh>
+      </group>
+
+      {/* 大头 */}
+      <mesh position={[0, 0.38, 0.02]} castShadow>
+        <sphereGeometry args={[0.125, 20, 20]} />
+        <Soft color={skin} />
+      </mesh>
+
+      {/* 鼓起的眼泡 */}
+      <mesh position={[-0.055, 0.48, 0.04]} castShadow>
+        <sphereGeometry args={[0.048, 14, 14]} />
+        <Soft color={skin} />
+      </mesh>
+      <mesh position={[0.055, 0.48, 0.04]} castShadow>
+        <sphereGeometry args={[0.048, 14, 14]} />
+        <Soft color={skin} />
+      </mesh>
+      <CuteEyes y={0.485} spread={0.055} z={0.08} iris="#2d5a1e" size={0.032} />
+      <Blush y={0.36} spread={0.085} z={0.1} />
+
+      {/* 宽嘴 */}
+      <mesh position={[0, 0.355, 0.11]} scale={[1.6, 0.55, 0.7]} castShadow>
+        <sphereGeometry args={[0.045, 14, 14]} />
+        <Soft color="#5ab86a" rough={0.55} coat={0.3} />
+      </mesh>
+      <mesh position={[0, 0.345, 0.13]} rotation={[0.15, 0, 0]} scale={[1.35, 0.35, 0.5]}>
+        <torusGeometry args={[0.028, 0.005, 6, 16, Math.PI]} />
+        <meshStandardMaterial color="#3d7a48" roughness={0.55} />
+      </mesh>
+
+      {/* 小鼻孔 */}
+      <mesh position={[-0.012, 0.39, 0.135]}>
+        <sphereGeometry args={[0.006, 6, 6]} />
+        <meshStandardMaterial color="#3d7a48" roughness={0.5} />
+      </mesh>
+      <mesh position={[0.012, 0.39, 0.135]}>
+        <sphereGeometry args={[0.006, 6, 6]} />
+        <meshStandardMaterial color="#3d7a48" roughness={0.5} />
+      </mesh>
+    </group>
+  )
+}
+
 export function AnimalFigure({ kind, accent }: { kind: AnimalKind; accent: string }) {
   switch (kind) {
     case 'pig':
@@ -526,5 +691,7 @@ export function AnimalFigure({ kind, accent }: { kind: AnimalKind; accent: strin
       return <RabbitFigure accent={accent} />
     case 'bear':
       return <BearFigure accent={accent} />
+    case 'frog':
+      return <FrogFigure accent={accent} />
   }
 }

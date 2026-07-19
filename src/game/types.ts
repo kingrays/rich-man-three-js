@@ -73,7 +73,7 @@ export interface PropertyState {
 }
 
 /** 棋子动物角色（开局可选） */
-export const ANIMAL_KINDS = ['pig', 'cat', 'rabbit', 'bear'] as const
+export const ANIMAL_KINDS = ['pig', 'cat', 'rabbit', 'bear', 'frog'] as const
 export type AnimalKind = (typeof ANIMAL_KINDS)[number]
 
 export const ANIMAL_LABELS: Record<AnimalKind, string> = {
@@ -81,6 +81,7 @@ export const ANIMAL_LABELS: Record<AnimalKind, string> = {
   cat: '猫咪',
   rabbit: '兔子',
   bear: '小熊',
+  frog: '青蛙',
 }
 
 export interface Player {
