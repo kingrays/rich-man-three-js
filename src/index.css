@@ -219,6 +219,126 @@ select:focus {
   text-shadow: 0 0 16px rgba(232, 93, 93, 0.35);
 }
 
+/* 格子详情提示（点击棋盘格） */
+.tile-info-backdrop {
+  z-index: 35;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.tile-info-modal {
+  max-width: 440px;
+}
+
+.tile-info-modal__badge {
+  display: inline-block;
+  margin-bottom: 0.55rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #1a1208;
+  background: linear-gradient(180deg, #f0d060, #d4af37);
+}
+
+.tile-info-modal__summary {
+  margin-bottom: 0.85rem;
+  line-height: 1.55;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.tile-info-modal__meta {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tile-info-modal__meta > div {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.tile-info-modal__meta dt {
+  color: var(--muted);
+  margin: 0;
+}
+
+.tile-info-modal__meta dd {
+  margin: 0;
+  text-align: right;
+}
+
+.tile-info-modal__section {
+  margin-bottom: 0.85rem;
+}
+
+.tile-info-modal__section h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.88rem;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.tile-info-modal__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.tile-info-modal__muted {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.tile-info-modal__tax {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #c9a0ff;
+}
+
+.tile-info-modal__rent-table {
+  width: 100%;
+  margin-top: 0.55rem;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.tile-info-modal__rent-table th,
+.tile-info-modal__rent-table td {
+  padding: 0.35rem 0.45rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+
+.tile-info-modal__rent-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tile-info-modal__rent-table td:last-child,
+.tile-info-modal__rent-table th:last-child {
+  text-align: right;
+}
+
+.tile-info-modal__rent-table tr.is-current td {
+  color: var(--gold-bright);
+  font-weight: 700;
+  background: rgba(212, 175, 55, 0.1);
+}
+
 /* 现金滚动与差额飘字 */
 .animated-cash {
   position: relative;
