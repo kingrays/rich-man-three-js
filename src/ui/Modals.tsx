@@ -1,7 +1,22 @@
 import { useState } from 'react'
-import { getTile } from '../game/board'
-import { getPlayer } from '../game/rules/helpers'
+import { COLOR_GROUP_TILES, getTile } from '../game/board'
+import { calcPropertyRent, getPlayer } from '../game/rules/helpers'
+import type { TileDef, TileType } from '../game/types'
 import { useGameStore } from '../store/gameStore'
+import { useUiStore } from '../store/uiStore'
+
+const TILE_TYPE_LABEL: Record<TileType, string> = {
+  go: '起点',
+  property: '街道地产',
+  railroad: '铁路',
+  utility: '公用事业',
+  tax: '税收',
+  chance: '机会卡',
+  chest: '社区基金',
+  jail: '监狱',
+  gotojail: '入狱',
+  parking: '免费停车',
+}
 
 export function PurchaseModal() {
   const state = useGameStore((s) => s.state)
@@ -405,4 +420,261 @@ export function GameOverModal() {
       </div>
     </div>
   )
+}
+
+/** 点击棋盘格子后弹出的详情说明 */
+export function TileInfoModal() {
+  const tileId = useUiStore((s) => s.inspectedTileId)
+  const close = useUiStore((s) => s.closeTileInspect)
+  const state = useGameStore((s) => s.state)
+
+  if (tileId === null) return null
+
+  const tile = getTile(tileId)
+  const prop = state.properties[tileId]
+  const owner =
+    prop?.ownerId != null
+      ? state.players.find((p) => p.id === prop.ownerId) ?? null
+      : null
+  const occupants = state.players.filter((p) => !p.bankrupt && p.position === tileId)
+  const summary = describeTileSituation(tile, state.goSalary)
+
+  return (
+    <div
+      className="modal-backdrop tile-info-backdrop"
+      onClick={close}
+      role="presentation"
+    >
+      <div
+        className="modal tile-info-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-labelledby="tile-info-title"
+      >
+        <div className="tile-info-modal__badge">{TILE_TYPE_LABEL[tile.type]}</div>
+        <h2 id="tile-info-title">{tile.name}</h2>
+        <p className="tile-info-modal__summary">{summary}</p>
+
+        <dl className="tile-info-modal__meta">
+          <div>
+            <dt>编号</dt>
+            <dd>第 {tile.id} 格</dd>
+          </div>
+          {occupants.length > 0 && (
+            <div>
+              <dt>当前停靠</dt>
+              <dd>
+                {occupants.map((p, i) => (
+                  <span key={p.id}>
+                    {i > 0 ? '、' : ''}
+                    <span style={{ color: p.color, fontWeight: 600 }}>{p.name}</span>
+                  </span>
+                ))}
+              </dd>
+            </div>
+          )}
+        </dl>
+
+        <TileOwnershipBlock tile={tile} prop={prop} owner={owner} />
+        <TileEconomyBlock tile={tile} prop={prop} />
+
+        <div className="modal-actions">
+          <button type="button" className="secondary" onClick={close}>
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function describeTileSituation(tile: TileDef, goSalary: number): string {
+  switch (tile.type) {
+    case 'go':
+      return `经过或停在此处可领取 $${goSalary}。`
+    case 'property':
+      return '可购买的街道地产。他人停靠需付租金；可建房提高租金。'
+    case 'railroad':
+      return '铁路地产。拥有的铁路越多，租金越高。'
+    case 'utility':
+      return '公用事业。租金按本次掷骰点数 × 倍率计算（拥有全部时倍率更高）。'
+    case 'tax':
+      return `停在此处需向银行缴纳 $${tile.taxAmount ?? 0} 税款。`
+    case 'chance':
+      return '停在此处将抽取一张机会卡，并立即执行卡面效果。'
+    case 'chest':
+      return '停在此处将抽取一张社区基金卡，并立即执行卡面效果。'
+    case 'jail':
+      return '路过仅为参观；被判入狱的玩家需在此服刑，可用现金、出狱卡或掷骰出狱。'
+    case 'gotojail':
+      return '停在此处将立即被送入监狱，且不经过起点、不领取工资。'
+    case 'parking':
+      return '免费停车格，停在此处无额外收支效果。'
+    default:
+      return '棋盘格子。'
+  }
+}
+
+function TileOwnershipBlock({
+  tile,
+  prop,
+  owner,
+}: {
+  tile: TileDef
+  prop: { ownerId: number | null; houses: number; mortgaged: boolean } | undefined
+  owner: { name: string; color: string } | null
+}) {
+  const isOwnable =
+    tile.type === 'property' || tile.type === 'railroad' || tile.type === 'utility'
+  if (!isOwnable) return null
+
+  const houses = prop?.houses ?? 0
+  const houseLabel =
+    houses === 0 ? '空地' : houses === 5 ? '酒店 ×1' : `房屋 ×${houses}`
+
+  return (
+    <div className="tile-info-modal__section">
+      <h3>所有权</h3>
+      {owner ? (
+        <ul className="tile-info-modal__list">
+          <li>
+            所有者：
+            <strong style={{ color: owner.color }}>{owner.name}</strong>
+          </li>
+          {tile.type === 'property' && <li>建筑：{houseLabel}</li>}
+          <li>状态：{prop?.mortgaged ? '已抵押（不计租金）' : '正常营业'}</li>
+        </ul>
+      ) : (
+        <p className="tile-info-modal__muted">尚未被购买，停靠后可出价购买或进入拍卖。</p>
+      )}
+    </div>
+  )
+}
+
+function TileEconomyBlock({
+  tile,
+  prop,
+}: {
+  tile: TileDef
+  prop: { ownerId: number | null; houses: number; mortgaged: boolean } | undefined
+}) {
+  const state = useGameStore((s) => s.state)
+
+  if (tile.type === 'property' && tile.price != null && tile.rent) {
+    const currentRent =
+      prop?.ownerId != null && !prop.mortgaged
+        ? calcPropertyRent(state, tile.id)
+        : null
+    return (
+      <div className="tile-info-modal__section">
+        <h3>价格与租金</h3>
+        <ul className="tile-info-modal__list">
+          <li>购买价：${tile.price}</li>
+          {tile.mortgage != null && <li>抵押价：${tile.mortgage}</li>}
+          {tile.houseCost != null && <li>建房/酒店费：${tile.houseCost}</li>}
+          {currentRent != null && (
+            <li>
+              当前租金：<strong>${currentRent}</strong>
+            </li>
+          )}
+        </ul>
+        <table className="tile-info-modal__rent-table">
+          <thead>
+            <tr>
+              <th>等级</th>
+              <th>租金</th>
+            </tr>
+          </thead>
+          <tbody>
+            {['空地', '1 栋房', '2 栋房', '3 栋房', '4 栋房', '酒店'].map((label, i) => (
+              <tr key={label} className={prop?.houses === i ? 'is-current' : undefined}>
+                <td>{label}</td>
+                <td>${tile.rent![i] ?? 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  if (tile.type === 'railroad' && tile.price != null && tile.rent) {
+    const ownedCount =
+      prop?.ownerId != null
+        ? COLOR_GROUP_TILES.railroad!.filter(
+            (id) =>
+              state.properties[id]?.ownerId === prop.ownerId &&
+              !state.properties[id]?.mortgaged,
+          ).length
+        : 0
+    const currentRent =
+      prop?.ownerId != null && !prop.mortgaged
+        ? calcPropertyRent(state, tile.id)
+        : null
+    return (
+      <div className="tile-info-modal__section">
+        <h3>价格与租金</h3>
+        <ul className="tile-info-modal__list">
+          <li>购买价：${tile.price}</li>
+          {tile.mortgage != null && <li>抵押价：${tile.mortgage}</li>}
+          {ownedCount > 0 && <li>该玩家拥有铁路：{ownedCount} 条</li>}
+          {currentRent != null && (
+            <li>
+              当前租金：<strong>${currentRent}</strong>
+            </li>
+          )}
+        </ul>
+        <table className="tile-info-modal__rent-table">
+          <thead>
+            <tr>
+              <th>拥有条数</th>
+              <th>租金</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[1, 2, 3, 4].map((n) => (
+              <tr key={n} className={ownedCount === n ? 'is-current' : undefined}>
+                <td>{n} 条</td>
+                <td>${tile.rent![n - 1] ?? 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  if (tile.type === 'utility' && tile.price != null && tile.rent) {
+    const ownedCount =
+      prop?.ownerId != null
+        ? COLOR_GROUP_TILES.utility!.filter(
+            (id) =>
+              state.properties[id]?.ownerId === prop.ownerId &&
+              !state.properties[id]?.mortgaged,
+          ).length
+        : 0
+    return (
+      <div className="tile-info-modal__section">
+        <h3>价格与租金</h3>
+        <ul className="tile-info-modal__list">
+          <li>购买价：${tile.price}</li>
+          {tile.mortgage != null && <li>抵押价：${tile.mortgage}</li>}
+          {ownedCount > 0 && <li>该玩家拥有公用事业：{ownedCount} 处</li>}
+          <li>拥有 1 处：骰点 × {tile.rent[0]}</li>
+          <li>拥有 2 处：骰点 × {tile.rent[1]}</li>
+        </ul>
+      </div>
+    )
+  }
+
+  if (tile.type === 'tax') {
+    return (
+      <div className="tile-info-modal__section">
+        <h3>税额</h3>
+        <p className="tile-info-modal__tax">${tile.taxAmount ?? 0}</p>
+      </div>
+    )
+  }
+
+  return null
 }

@@ -1,7 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import type { ThreeEvent } from '@react-three/fiber'
 import { CanvasTexture, type Texture } from 'three'
 import { BOARD } from '../game/board'
 import type { Player, PropertyState, TileDef } from '../game/types'
+import { useUiStore } from '../store/uiStore'
 import {
   DeedMarker,
   edgeBuildPos,
@@ -12,6 +14,11 @@ import {
   TrainModel,
   UtilityModel,
 } from './Buildings'
+
+/** 拖拽超过此像素则视为旋转视角，不当作点击 */
+const CLICK_MOVE_THRESHOLD = 6
+/** 点击闪光动画时长（毫秒） */
+const FLASH_MS = 280
 
 /** 角格边长、边格宽度、边格进深 */
 export const CORNER = 1.6
@@ -169,6 +176,13 @@ function TileBlock({
   const owned = prop?.ownerId != null
   const mortgaged = !!prop?.mortgaged
   const houses = prop?.houses ?? 0
+  const inspectTile = useUiStore((s) => s.inspectTile)
+
+  const [pressed, setPressed] = useState(false)
+  const [flash, setFlash] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const pointerDown = useRef<{ x: number; y: number } | null>(null)
+  const flashTimer = useRef<number | null>(null)
 
   const label = useMemo(() => {
     let sub: string | undefined
@@ -187,9 +201,47 @@ function TileBlock({
       ? '#f4ede8'
       : baseTileColor(tile)
   const lift = owned ? 0.02 : 0
-  const emissive = highlight ? '#d4a84b' : '#000000'
-  const emissiveIntensity = highlight ? 0.35 : 0
+  // 按下略下沉；点击后短暂抬起闪光
+  const pressDip = pressed ? -0.025 : flash ? 0.03 : hovered ? 0.012 : 0
+  const emissive = flash
+    ? '#f0d060'
+    : highlight
+      ? '#d4a84b'
+      : hovered
+        ? '#c4a35a'
+        : '#000000'
+  const emissiveIntensity = flash ? 0.7 : highlight ? 0.35 : hovered ? 0.18 : 0
   const side = Math.floor(tile.id / 10)
+  const bodyY = lift + pressDip
+
+  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation()
+    pointerDown.current = { x: e.clientX, y: e.clientY }
+    setPressed(true)
+  }
+
+  const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation()
+    const start = pointerDown.current
+    pointerDown.current = null
+    setPressed(false)
+    if (!start) return
+    const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y)
+    // 拖拽旋转视角时不触发格子点击
+    if (moved > CLICK_MOVE_THRESHOLD) return
+
+    if (flashTimer.current != null) window.clearTimeout(flashTimer.current)
+    setFlash(true)
+    flashTimer.current = window.setTimeout(() => setFlash(false), FLASH_MS)
+    inspectTile(tile.id)
+  }
+
+  const onPointerOut = () => {
+    pointerDown.current = null
+    setPressed(false)
+    setHovered(false)
+    document.body.style.cursor = 'auto'
+  }
 
   return (
     <group position={tileWorldPosition(tile.id)}>
@@ -198,7 +250,20 @@ function TileBlock({
         <meshStandardMaterial color="#5c4330" roughness={0.9} />
       </mesh>
 
-      <mesh castShadow receiveShadow position={[0, lift, 0]}>
+      {/* 可点击主体：按下下沉 + 悬停/点击发光 */}
+      <mesh
+        castShadow
+        receiveShadow
+        position={[0, bodyY, 0]}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerOver={(e) => {
+          e.stopPropagation()
+          setHovered(true)
+          document.body.style.cursor = 'pointer'
+        }}
+        onPointerOut={onPointerOut}
+      >
         <boxGeometry args={size} />
         <meshStandardMaterial
           color={bodyColor}
@@ -210,7 +275,18 @@ function TileBlock({
       </mesh>
 
       <group rotation={[0, labelYaw(tile.id), 0]}>
-        <mesh position={[0, topY + lift + 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh
+          position={[0, topY + bodyY + 0.008, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
+          onPointerOver={(e) => {
+            e.stopPropagation()
+            setHovered(true)
+            document.body.style.cursor = 'pointer'
+          }}
+          onPointerOut={onPointerOut}
+        >
           <planeGeometry args={labelPlaneSize(tile.id, size)} />
           <meshStandardMaterial
             map={label}
@@ -225,29 +301,29 @@ function TileBlock({
       </group>
 
       {owned && owner && !mortgaged && (
-        <OwnerFrame w={size[0]} d={size[2]} y={topY + lift + 0.012} color={owner.color} />
+        <OwnerFrame w={size[0]} d={size[2]} y={topY + bodyY + 0.012} color={owner.color} />
       )}
 
       {tile.type === 'railroad' && (
-        <TrainModel position={edgeIconPos(side, size, lift, topY)} />
+        <TrainModel position={edgeIconPos(side, size, bodyY, topY)} />
       )}
       {tile.type === 'utility' && (
         <UtilityModel
           kind={tile.id === 12 ? 'electric' : 'water'}
-          position={edgeIconPos(side, size, lift, topY)}
+          position={edgeIconPos(side, size, bodyY, topY)}
         />
       )}
 
       {owned && owner && houses === 0 && !mortgaged && (
         <DeedMarker
           color={owner.color}
-          position={edgeIconPos(side, size, lift, topY)}
+          position={edgeIconPos(side, size, bodyY, topY)}
           yaw={labelYaw(tile.id)}
         />
       )}
 
       {houses > 0 && houses < 5 && (
-        <group position={edgeBuildPos(side, size, lift, topY)}>
+        <group position={edgeBuildPos(side, size, bodyY, topY)}>
           {Array.from({ length: houses }).map((_, i) => {
             const spread = (i - (houses - 1) / 2) * 0.22
             return (
@@ -261,11 +337,11 @@ function TileBlock({
       )}
 
       {houses === 5 && (
-        <SkyscraperModel position={edgeBuildPos(side, size, lift, topY)} />
+        <SkyscraperModel position={edgeBuildPos(side, size, bodyY, topY)} />
       )}
 
       {mortgaged && (
-        <mesh position={[0, topY + lift + 0.04, 0]} rotation={[0, Math.PI / 4, 0]}>
+        <mesh position={[0, topY + bodyY + 0.04, 0]} rotation={[0, Math.PI / 4, 0]}>
           <boxGeometry args={[Math.min(size[0], size[2]) * 0.7, 0.03, 0.05]} />
           <meshStandardMaterial color="#5a5048" />
         </mesh>

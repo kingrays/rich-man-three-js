@@ -7,6 +7,7 @@ import {
   GameOverModal,
   PurchaseModal,
   RentModal,
+  TileInfoModal,
   TradeModal,
 } from './ui/Modals'
 import { GameScene } from './scene/GameScene'
@@ -71,6 +72,7 @@ export default function App() {
       <AuctionModal />
       <TradeModal />
       <GameOverModal />
+      <TileInfoModal />
     </div>
   )
 }
