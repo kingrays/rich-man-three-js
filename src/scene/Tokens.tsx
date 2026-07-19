@@ -16,12 +16,12 @@ const TOKEN_Y = 0.02
 const FOLLOW_Y = 0.15
 
 /** 从 from 顺时针走到 to 的中间格序列（含终点，不含起点） */
-function buildForwardPath(from: number, to: number): number[] {
+function buildForwardPath(from: number, to: number, boardLength: number): number[] {
   const path: number[] = []
   let p = from
   // 最多一圈，避免异常死循环
-  for (let i = 0; i < 40; i++) {
-    p = (p + 1) % 40
+  for (let i = 0; i < boardLength; i++) {
+    p = (p + 1) % boardLength
     path.push(p)
     if (p === to) break
   }
@@ -31,6 +31,7 @@ function buildForwardPath(from: number, to: number): number[] {
 function TokenMesh({
   player,
   slot,
+  boardLength,
   /** 当前是否处于掷骰后的移动阶段，且为本棋子 */
   stepping,
   /** 逻辑已跳到终点时，视觉应从哪一格开始走 */
@@ -43,6 +44,7 @@ function TokenMesh({
 }: {
   player: Player
   slot: number
+  boardLength: number
   stepping: boolean
   stepFrom: number | null
   holdAtStart: boolean
@@ -63,6 +65,8 @@ function TokenMesh({
   const steppingKey = useRef<string | null>(null)
   const onArriveRef = useRef(onArrive)
   onArriveRef.current = onArrive
+  const boardLenRef = useRef(boardLength)
+  boardLenRef.current = boardLength
 
   // 同格多棋子错开
   const ox = ((slot % 2) - 0.5) * 0.35
@@ -70,7 +74,7 @@ function TokenMesh({
   const animal = resolveAnimalKind(player)
 
   const syncWorld = (index: number) => {
-    const [x, , z] = tileWorldPosition(index)
+    const [x, , z] = tileWorldPosition(index, boardLenRef.current)
     fromXZ.current = { x, z }
     toXZ.current = { x, z }
     progress.current = 1
@@ -81,104 +85,88 @@ function TokenMesh({
     }
   }
 
-  const startNextStep = () => {
-    const next = queue.current.shift()
-    if (next === undefined) {
-      // 路径走完
-      if (stepping && !arrived.current) {
-        arrived.current = true
-        onArriveRef.current?.()
-      }
+  // 非走动时：逻辑位置变化则瞬移对齐
+  useEffect(() => {
+    if (stepping || holdAtStart) return
+    visualIndex.current = player.position
+    queue.current = []
+    syncWorld(player.position)
+    steppingKey.current = null
+    arrived.current = false
+  }, [player.position, stepping, holdAtStart, ox, oz, boardLength])
+
+  // 开局 / 棋盘尺寸变化时对齐一次
+  useEffect(() => {
+    syncWorld(visualIndex.current)
+  }, [ox, oz, boardLength])
+
+  // 开始走动：从 stepFrom 走到逻辑终点
+  useEffect(() => {
+    if (!stepping || stepFrom === null) return
+    const key = `${player.id}:${stepFrom}->${player.position}`
+    if (steppingKey.current === key) return
+    steppingKey.current = key
+    arrived.current = false
+    visualIndex.current = stepFrom
+    queue.current = buildForwardPath(stepFrom, player.position, boardLength)
+    if (queue.current.length === 0) {
+      syncWorld(player.position)
+      onArriveRef.current?.()
       return
     }
-    const [fx, , fz] = tileWorldPosition(visualIndex.current)
-    const [tx, , tz] = tileWorldPosition(next)
+    const next = queue.current[0]!
+    const [fx, , fz] = tileWorldPosition(visualIndex.current, boardLength)
+    const [tx, , tz] = tileWorldPosition(next, boardLength)
     fromXZ.current = { x: fx, z: fz }
     toXZ.current = { x: tx, z: tz }
     progress.current = 0
-    visualIndex.current = next
-  }
-
-  // 掷骰移动：从 stepFrom 逐格走到逻辑 position
-  useEffect(() => {
-    // 视角飞行等待中：先停在起点，避免瞬移到终点
-    if (holdAtStart && stepFrom !== null) {
-      steppingKey.current = null
-      queue.current = []
-      progress.current = 1
-      arrived.current = false
-      visualIndex.current = stepFrom
-      syncWorld(stepFrom)
-      if (reportLive && ref.current) {
-        syncTokenLivePosition([
-          ref.current.position.x,
-          FOLLOW_Y,
-          ref.current.position.z,
-        ])
-      }
-      return
-    }
-
-    if (stepping && stepFrom !== null) {
-      const key = `${stepFrom}->${player.position}`
-      if (steppingKey.current === key) return
-      steppingKey.current = key
-      arrived.current = false
-      visualIndex.current = stepFrom
-      syncWorld(stepFrom)
-      queue.current = buildForwardPath(stepFrom, player.position)
-      startNextStep()
-      return
-    }
-
-    // 非逐步阶段：瞬移对齐逻辑位置（卡牌传送、开局等）
-    steppingKey.current = null
-    queue.current = []
-    progress.current = 1
-    if (visualIndex.current !== player.position) {
-      visualIndex.current = player.position
-      syncWorld(player.position)
-    }
-  }, [stepping, stepFrom, holdAtStart, player.position, ox, oz])
+  }, [stepping, stepFrom, player.id, player.position, boardLength])
 
   useFrame((_, dt) => {
-    if (!ref.current) return
     const g = ref.current
+    if (!g) return
 
-    if (progress.current < 1) {
+    if (queue.current.length > 0) {
       progress.current = Math.min(1, progress.current + dt / STEP_DURATION)
-      // 轻微缓出，读起来更跟手
-      const t = 1 - (1 - progress.current) ** 2
-      const { x: fx, z: fz } = fromXZ.current
-      const { x: tx, z: tz } = toXZ.current
-      g.position.x = fx + (tx - fx) * t + ox
-      g.position.z = fz + (tz - fz) * t + oz
-      // 抛物线小跳
-      g.position.y = TOKEN_Y + Math.sin(t * Math.PI) * HOP_HEIGHT
+      const t = progress.current
+      // 平滑插值 + 小跳
+      const hop = Math.sin(t * Math.PI) * HOP_HEIGHT
+      g.position.x = fromXZ.current.x + (toXZ.current.x - fromXZ.current.x) * t + ox
+      g.position.z = fromXZ.current.z + (toXZ.current.z - fromXZ.current.z) * t + oz
+      g.position.y = TOKEN_Y + hop
 
       if (reportLive) {
-        syncTokenLivePosition([g.position.x, FOLLOW_Y, g.position.z])
+        syncTokenLivePosition(g.position.x, FOLLOW_Y, g.position.z)
       }
 
-      if (progress.current >= 1) {
-        g.position.y = TOKEN_Y
-        startNextStep()
+      if (t >= 1) {
+        const landed = queue.current.shift()!
+        visualIndex.current = landed
+        if (queue.current.length === 0) {
+          syncWorld(landed)
+          if (!arrived.current) {
+            arrived.current = true
+            onArriveRef.current?.()
+          }
+        } else {
+          const next = queue.current[0]!
+          const [fx, , fz] = tileWorldPosition(visualIndex.current, boardLenRef.current)
+          const [tx, , tz] = tileWorldPosition(next, boardLenRef.current)
+          fromXZ.current = { x: fx, z: fz }
+          toXZ.current = { x: tx, z: tz }
+          progress.current = 0
+        }
       }
       return
     }
 
-    // 静止时仍跟随 slot 偏移（同格人数变化）
-    const [x, , z] = tileWorldPosition(visualIndex.current)
-    g.position.x += (x + ox - g.position.x) * Math.min(1, dt * 8)
-    g.position.z += (z + oz - g.position.z) * Math.min(1, dt * 8)
-    g.position.y = TOKEN_Y
-
+    // 静止时也上报，便于相机落稳
     if (reportLive) {
-      syncTokenLivePosition([g.position.x, FOLLOW_Y, g.position.z])
+      syncTokenLivePosition(g.position.x, FOLLOW_Y, g.position.z)
     }
   })
 
-  const spawn = tileWorldPosition(player.position)
+  const spawn = tileWorldPosition(player.position, boardLength)
   return (
     <group ref={ref} position={[spawn[0] + ox, TOKEN_Y, spawn[2] + oz]}>
       <AnimalFigure kind={animal} accent={player.color} />
@@ -188,15 +176,15 @@ function TokenMesh({
 
 export function Tokens({
   players,
+  boardLength,
   movingPlayerId,
   moveSteps,
   moveActive,
   onMoveComplete,
 }: {
   players: Player[]
-  /** 正在逐步走动的玩家；null 表示无 */
+  boardLength: number
   movingPlayerId: number | null
-  /** 本次应走的格数（来自骰子） */
   moveSteps: number | null
   /** 视角飞完并停顿后才为 true，此时才真正迈步 */
   moveActive: boolean
@@ -224,7 +212,9 @@ export function Tokens({
         slots.set(p.position, n + 1)
         const isMover =
           movingPlayerId === p.id && moveSteps !== null && moveSteps > 0
-        const stepFrom = isMover ? (p.position - moveSteps! + 40) % 40 : null
+        const stepFrom = isMover
+          ? (p.position - moveSteps! + boardLength) % boardLength
+          : null
         const holdAtStart = isMover && !moveActive
         const stepping = isMover && moveActive
         return (
@@ -232,6 +222,7 @@ export function Tokens({
             key={p.id}
             player={p}
             slot={n}
+            boardLength={boardLength}
             stepping={stepping}
             stepFrom={stepFrom}
             holdAtStart={holdAtStart}

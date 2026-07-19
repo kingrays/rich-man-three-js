@@ -475,6 +475,13 @@ select:focus {
   margin-top: 0.65rem;
 }
 
+.lobby-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .lobby-players {
   flex: 1;
   min-height: 0;

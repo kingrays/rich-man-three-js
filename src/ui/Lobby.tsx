@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { GO_SALARY, STARTING_CASH } from '../game/board'
+import {
+  BOARD_SIZE_OPTIONS,
+  DEFAULT_BOARD_SIZE,
+  GO_SALARY,
+  STARTING_CASH,
+  type BoardSizeId,
+} from '../game/board'
 import {
   ANIMAL_KINDS,
   ANIMAL_LABELS,
@@ -18,6 +24,7 @@ export function Lobby() {
   const [animals, setAnimals] = useState<AnimalKind[]>([...DEFAULT_ANIMALS])
   const [startingCash, setStartingCash] = useState(STARTING_CASH)
   const [goSalary, setGoSalary] = useState(GO_SALARY)
+  const [boardSize, setBoardSize] = useState<BoardSizeId>(DEFAULT_BOARD_SIZE)
 
   const start = () => {
     const players = Array.from({ length: count }, (_, i) => ({
@@ -30,6 +37,7 @@ export function Lobby() {
       players,
       startingCash,
       goSalary,
+      boardSize,
     })
   }
 
@@ -54,6 +62,23 @@ export function Lobby() {
               <option value={4}>4 人</option>
             </select>
           </label>
+
+          <label className="lobby-field">
+            <span className="lobby-label">棋盘大小</span>
+            <select
+              value={boardSize}
+              onChange={(e) => setBoardSize(e.target.value as BoardSizeId)}
+            >
+              {BOARD_SIZE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="lobby-hint">
+            城市地产随机生成；北京、上海、广州、深圳常驻且价格最高。
+          </p>
 
           <div className="lobby-money-row">
             <label className="lobby-field">

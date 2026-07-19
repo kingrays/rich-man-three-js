@@ -9,7 +9,7 @@ import {
   Vector3,
 } from 'three'
 import { syncDiceLivePosition, useCameraStore } from '../store/cameraStore'
-import { BOARD_HALF, BOARD_SURFACE_Y } from './Board'
+import { BOARD_SURFACE_Y } from './Board'
 
 const DIE_SIZE = 0.48
 const DIE_HALF = DIE_SIZE / 2
@@ -19,7 +19,6 @@ const ANG_SLEEP = 0.35
 const MAX_SIM_SEC = 6
 const WALL_H = 2.2
 const WALL_T = 0.2
-const PLAY_HALF = BOARD_HALF - 0.15
 
 /** 默认静置位置（棋盘中央偏前）；开局后落点会变，相机跟随真实位置 */
 export const DICE_DEFAULT_REST: [number, number, number] = [
@@ -162,12 +161,22 @@ interface PhysicsDieProps {
   impulse: [number, number, number]
   torque: [number, number, number]
   active: boolean
+  /** 骰盘可活动半宽（随棋盘尺寸） */
+  playHalf: number
   onSettled: (value: number, pos: [number, number, number]) => void
   /** 每帧上报位置，供相机跟随 */
   onMove?: (pos: [number, number, number]) => void
 }
 
-function PhysicsDie({ start, impulse, torque, active, onSettled, onMove }: PhysicsDieProps) {
+function PhysicsDie({
+  start,
+  impulse,
+  torque,
+  active,
+  playHalf,
+  onSettled,
+  onMove,
+}: PhysicsDieProps) {
   const body = useRef<RapierRigidBody>(null)
   const stable = useRef(0)
   const done = useRef(false)
@@ -225,8 +234,8 @@ function PhysicsDie({ start, impulse, torque, active, onSettled, onMove }: Physi
     if (nearlyStill) stable.current += 1
     else stable.current = 0
 
-    const clampedX = Math.max(-PLAY_HALF, Math.min(PLAY_HALF, pos.x))
-    const clampedZ = Math.max(-PLAY_HALF, Math.min(PLAY_HALF, pos.z))
+    const clampedX = Math.max(-playHalf, Math.min(playHalf, pos.x))
+    const clampedZ = Math.max(-playHalf, Math.min(playHalf, pos.z))
     if (clampedX !== pos.x || clampedZ !== pos.z) {
       rb.setTranslation(
         { x: clampedX, y: Math.max(pos.y, BOARD_SURFACE_Y + DIE_HALF), z: clampedZ },
@@ -276,7 +285,7 @@ function PhysicsDie({ start, impulse, torque, active, onSettled, onMove }: Physi
   )
 }
 
-function BoardArena() {
+function BoardArena({ boardHalf }: { boardHalf: number }) {
   const floorHalfH = 0.08
   const floorY = BOARD_SURFACE_Y - floorHalfH
 
@@ -284,22 +293,22 @@ function BoardArena() {
     <>
       <RigidBody type="fixed" colliders={false} position={[0, floorY, 0]}>
         <CuboidCollider
-          args={[BOARD_HALF, floorHalfH, BOARD_HALF]}
+          args={[boardHalf, floorHalfH, boardHalf]}
           friction={0.85}
           restitution={0.18}
         />
       </RigidBody>
-      <RigidBody type="fixed" colliders={false} position={[0, WALL_H / 2, BOARD_HALF + WALL_T / 2]}>
-        <CuboidCollider args={[BOARD_HALF + WALL_T, WALL_H / 2, WALL_T / 2]} friction={0.4} restitution={0.4} />
+      <RigidBody type="fixed" colliders={false} position={[0, WALL_H / 2, boardHalf + WALL_T / 2]}>
+        <CuboidCollider args={[boardHalf + WALL_T, WALL_H / 2, WALL_T / 2]} friction={0.4} restitution={0.4} />
       </RigidBody>
-      <RigidBody type="fixed" colliders={false} position={[0, WALL_H / 2, -(BOARD_HALF + WALL_T / 2)]}>
-        <CuboidCollider args={[BOARD_HALF + WALL_T, WALL_H / 2, WALL_T / 2]} friction={0.4} restitution={0.4} />
+      <RigidBody type="fixed" colliders={false} position={[0, WALL_H / 2, -(boardHalf + WALL_T / 2)]}>
+        <CuboidCollider args={[boardHalf + WALL_T, WALL_H / 2, WALL_T / 2]} friction={0.4} restitution={0.4} />
       </RigidBody>
-      <RigidBody type="fixed" colliders={false} position={[BOARD_HALF + WALL_T / 2, WALL_H / 2, 0]}>
-        <CuboidCollider args={[WALL_T / 2, WALL_H / 2, BOARD_HALF + WALL_T]} friction={0.4} restitution={0.4} />
+      <RigidBody type="fixed" colliders={false} position={[boardHalf + WALL_T / 2, WALL_H / 2, 0]}>
+        <CuboidCollider args={[WALL_T / 2, WALL_H / 2, boardHalf + WALL_T]} friction={0.4} restitution={0.4} />
       </RigidBody>
-      <RigidBody type="fixed" colliders={false} position={[-(BOARD_HALF + WALL_T / 2), WALL_H / 2, 0]}>
-        <CuboidCollider args={[WALL_T / 2, WALL_H / 2, BOARD_HALF + WALL_T]} friction={0.4} restitution={0.4} />
+      <RigidBody type="fixed" colliders={false} position={[-(boardHalf + WALL_T / 2), WALL_H / 2, 0]}>
+        <CuboidCollider args={[WALL_T / 2, WALL_H / 2, boardHalf + WALL_T]} friction={0.4} restitution={0.4} />
       </RigidBody>
     </>
   )
@@ -311,6 +320,8 @@ interface DiceTrayProps {
   rolling: boolean
   /** 展示朝上的点数（静置时） */
   displayValue: number
+  /** 棋盘半宽，用于骰盘碰撞边界 */
+  boardHalf: number
   onSettled: (die: number) => void
 }
 
@@ -320,11 +331,18 @@ interface DiceTrayProps {
  * - 投掷中：从静置位置弹起并做物理翻滚
  * - 停稳后：继续留在落点
  */
-export function DiceTray({ rollId, rolling, displayValue, onSettled }: DiceTrayProps) {
+export function DiceTray({
+  rollId,
+  rolling,
+  displayValue,
+  boardHalf,
+  onSettled,
+}: DiceTrayProps) {
   const reported = useRef(false)
   const setDicePosition = useCameraStore((s) => s.setDicePosition)
   const [restPos, setRestPos] = useState<[number, number, number]>(DICE_DEFAULT_REST)
   const [restValue, setRestValue] = useState(displayValue)
+  const playHalf = boardHalf - 0.15
 
   // 把真实落点同步给相机，飞往骰子时才对准
   useEffect(() => {
@@ -380,12 +398,13 @@ export function DiceTray({ rollId, rolling, displayValue, onSettled }: DiceTrayP
   if (rolling) {
     return (
       <Physics gravity={[0, -18, 0]} timeStep="vary">
-        <BoardArena />
+        <BoardArena boardHalf={boardHalf} />
         <PhysicsDie
           key={`die-${rollId}`}
           start={throwCfg.start}
           impulse={throwCfg.impulse}
           torque={throwCfg.torque}
+          playHalf={playHalf}
           active
           onMove={syncDiceLivePosition}
           onSettled={handleSettled}

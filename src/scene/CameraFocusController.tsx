@@ -25,13 +25,14 @@ type FocusAnim = {
 function playerFocusPoint(
   players: Player[],
   playerId: number,
+  boardLength: number,
   tileIndex?: number,
 ): Vector3 | null {
   const player = players.find((p) => p.id === playerId)
   if (!player || player.bankrupt) return null
 
   const index = tileIndex ?? player.position
-  const [tx, , tz] = tileWorldPosition(index)
+  const [tx, , tz] = tileWorldPosition(index, boardLength)
   const aliveOnTile = players.filter((p) => !p.bankrupt && p.position === index)
   const slot = aliveOnTile.findIndex((p) => p.id === playerId)
   const ox = slot >= 0 ? ((slot % 2) - 0.5) * 0.35 : 0
@@ -40,7 +41,13 @@ function playerFocusPoint(
 }
 
 /** 监听飞往请求，平滑移动 OrbitControls；投掷/走动时持续跟随 */
-export function CameraFocusController({ players }: { players: Player[] }) {
+export function CameraFocusController({
+  players,
+  boardLength,
+}: {
+  players: Player[]
+  boardLength: number
+}) {
   const focusSeq = useCameraStore((s) => s.focusSeq)
   const request = useCameraStore((s) => s.request)
   const followDice = useCameraStore((s) => s.followDice)
@@ -75,6 +82,7 @@ export function CameraFocusController({ players }: { players: Player[] }) {
       endTarget = playerFocusPoint(
         playersRef.current,
         request.playerId,
+        boardLength,
         request.tileIndex,
       )
       if (!endTarget) {
@@ -120,7 +128,7 @@ export function CameraFocusController({ players }: { players: Player[] }) {
     }
     // 故意不依赖 players：走动结束 resolveLanding 会更新 players，
     // 若重跑 effect 会带着仍含起步格的旧 request 再次飞往，把镜头拉回起点
-  }, [focusSeq, request, camera, controls, signalArrival])
+  }, [focusSeq, request, camera, controls, signalArrival, boardLength])
 
   useFrame((_, dt) => {
     const ctrl = controls as OrbitControlsImpl | null
